@@ -1,0 +1,15 @@
+{
+  "name": "原木カウンター",
+  "short_name": "原木",
+  "description": "写真の木口をタップして原木の本数を数える",
+  "start_url": "index.html",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1E1610",
+  "theme_color": "#1E1610",
+  "icons": [
+    { "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
