@@ -103,7 +103,7 @@
 <div id="stage"><canvas id="cv"></canvas></div>
 
 <div id="count" class="hide"><b id="num">0</b><span>本</span></div>
-<div id="ver">v9 AI</div>
+<div id="ver">v10 AI</div>
 
 <div id="empty">
   <h1>原木カウンター</h1>
@@ -456,7 +456,7 @@ async function load(file){
     resize(); fitView(); placePanels();
     loadAI().then(ok=>{
       const v=document.getElementById('ver');
-      v.textContent = ok ? 'v9 AI ○' : 'v9 AI ×';
+      v.textContent = ok ? 'v10 AI ○' : 'v10 AI ×';
       v.style.color = ok ? '#7CFF3B' : '#FF8A5C';
     });
   }finally{
@@ -707,40 +707,27 @@ function detect(sensV, R){
    genboku_v2.onnx が同じ場所に置いてあれば、そちらを使う。
    無ければ従来の画像処理に自動で切り替わる。 */
 const AI_SIZE=960;                 // 学習時と同じ大きさ
-const ORT_CDNS=[
-  'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/',
-  'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/',
-  'https://unpkg.com/onnxruntime-web@1.20.1/dist/',
-  'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/',
+
+/* AIライブラリの候補。
+   新しい版は「モジュール形式」なので import で読む。
+   古い版は普通のスクリプトで読める。順に試す。 */
+const AI_LIBS=[
+  {way:'mjs', base:'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/', file:'ort.min.mjs'},
+  {way:'mjs', base:'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/', file:'ort.min.mjs'},
+  {way:'tag', base:'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/', file:'ort.min.js'},
+  {way:'tag', base:'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.3/dist/', file:'ort.min.js'},
+  {way:'mjs', base:'https://unpkg.com/onnxruntime-web@1.20.1/dist/',            file:'ort.min.mjs'},
 ];
 let ort=null, session=null, aiReady=false, aiTried=false, aiError='';
 
-/* ライブラリの読み込み。2通りの方法を試す。
-   1) 普通のスクリプトタグで読む
-   2) ファイルとして取得してから実行する（1が塞がれている環境向け） */
-function loadScriptTag(url){
+function loadTag(url){
   return new Promise((res,rej)=>{
     const el=document.createElement('script');
     el.src=url;
     el.onload=()=>res();
-    el.onerror=()=>rej(new Error('script不可'));
+    el.onerror=()=>rej(new Error('取得不可'));
     document.head.appendChild(el);
-    setTimeout(()=>rej(new Error('script時間切れ')),20000);
-  });
-}
-async function loadScriptFetch(url){
-  const r=await fetch(url,{mode:'cors'});
-  if(!r.ok) throw new Error('HTTP '+r.status);
-  const code=await r.text();
-  if(code.length<10000) throw new Error('中身が短い('+code.length+')');
-  const blob=new Blob([code],{type:'text/javascript'});
-  const burl=URL.createObjectURL(blob);
-  await new Promise((res,rej)=>{
-    const el=document.createElement('script');
-    el.src=burl;
-    el.onload=()=>res();
-    el.onerror=()=>rej(new Error('blob不可'));
-    document.head.appendChild(el);
+    setTimeout(()=>rej(new Error('時間切れ')),25000);
   });
 }
 
@@ -751,30 +738,30 @@ async function loadAI(){
   const logs=[];
   let base=null;
 
-  if(window.ort){
-    base=ORT_CDNS[0];
-  }else{
-    outer:
-    for(const b of ORT_CDNS){
-      for(const [nm,fn] of [['tag',loadScriptTag],['fetch',loadScriptFetch]]){
-        try{
-          await fn(b+'ort.min.js');
-          if(window.ort){ base=b; break outer; }
-          logs.push(nm+':読めたがortなし');
-        }catch(e){
-          logs.push(nm+':'+(e.message||e));
-        }
+  for(const c of AI_LIBS){
+    const tag=c.way+'@'+(c.base.match(/@([\d.]+)/)||['',''])[1];
+    try{
+      if(c.way==='mjs'){
+        const m=await import(c.base+c.file);
+        if(m && m.InferenceSession){ ort=m; base=c.base; break; }
+        if(window.ort){ ort=window.ort; base=c.base; break; }
+        logs.push(tag+':中身なし');
+      }else{
+        await loadTag(c.base+c.file);
+        if(window.ort){ ort=window.ort; base=c.base; break; }
+        logs.push(tag+':ortなし');
       }
+    }catch(e){
+      logs.push(tag+':'+String(e.message||e).slice(0,40));
     }
   }
 
-  if(!window.ort){
-    aiError='ライブラリ不可 ['+logs.slice(0,4).join(' / ')+']';
+  if(!ort){
+    aiError='ライブラリ不可 ['+logs.slice(0,5).join(' / ')+']';
     return false;
   }
 
   try{
-    ort=window.ort;
     ort.env.wasm.wasmPaths=base;
     ort.env.wasm.numThreads=1;
     const res=await fetch('./genboku_v3.onnx');
@@ -784,7 +771,7 @@ async function loadAI(){
     session=await ort.InferenceSession.create(buf,{executionProviders:['wasm']});
     aiReady=true; aiError='';
   }catch(e){
-    aiError='モデル: '+(e.message||e);
+    aiError='モデル: '+String(e.message||e).slice(0,120);
     aiReady=false;
   }
   return aiReady;
