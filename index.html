@@ -76,6 +76,12 @@
   #bar button.erasing{background:#7A1D12;border-color:#FF6B4A;color:#FFD9CF;}
   #eraseBanner{position:fixed;left:0;right:0;top:0;padding:calc(6px + env(safe-area-inset-top)) 8px 6px;
     background:#7A1D12;color:#FFE3DA;font-size:12px;text-align:center;font-weight:600;letter-spacing:.04em;}
+  #roiBanner{position:fixed;left:0;right:0;top:0;padding:calc(10px + env(safe-area-inset-top)) 14px 12px;
+    background:rgba(4,34,43,.96);color:#EAF7FB;backdrop-filter:blur(6px);}
+  #roiMsg{font-size:13px;font-weight:700;text-align:center;line-height:1.5;}
+  #roiCount{font-size:11.5px;color:#7FDCEF;text-align:center;margin-top:4px;font-variant-numeric:tabular-nums;}
+  #roiBanner .act{padding:10px 4px;font-size:12px;}
+  #roiBanner .act:disabled{opacity:.4;}
 
   /* 見た目パネル */
   #panel{position:fixed;left:8px;right:8px;bottom:calc(84px + env(safe-area-inset-bottom));
@@ -107,7 +113,7 @@
 <div id="stage"><canvas id="cv"></canvas></div>
 
 <div id="count" class="hide"><b id="num">0</b><span>本</span></div>
-<div id="ver">v11 AI</div>
+<div id="ver">v12 AI</div>
 
 <div id="empty">
   <h1>原木カウンター</h1>
@@ -181,6 +187,15 @@
 </div>
 
 <div id="eraseBanner" class="hide">消すモード：消したい印をタップ</div>
+<div id="roiBanner" class="hide">
+  <div id="roiMsg">写真の上を指でタップして、範囲の角を順番に囲んでください</div>
+  <div id="roiCount">0点</div>
+  <div class="row" style="gap:6px;margin-top:8px">
+    <button id="roiUndo" class="act ghost" disabled>1つ戻す</button>
+    <button id="roiFinish" class="act" disabled>この範囲に決定</button>
+    <button id="roiCancel" class="act ghost">やめる</button>
+  </div>
+</div>
 <div id="busy" class="hide">写真を読み込み中…</div>
 <input type="file" id="file" accept="image/*">
 
@@ -260,12 +275,19 @@ function draw(){
       ctx.fillStyle=tc; ctx.fillText(i+1,p.x,p.y+1);
     }
   });
-  // 描いている途中の線
-  if(roiDraft && roiDraft.length>1){
+  // 打った点をつないで輪郭を描く（描いている途中）
+  if(roiMode && roiDraft.length>0){
     ctx.beginPath();
     const p0=toScreen(roiDraft[0]); ctx.moveTo(p0.x,p0.y);
     for(let i=1;i<roiDraft.length;i++){ const p=toScreen(roiDraft[i]); ctx.lineTo(p.x,p.y); }
     ctx.lineWidth=3; ctx.strokeStyle='#00C6FF'; ctx.lineJoin='round'; ctx.lineCap='round'; ctx.stroke();
+    // 打った点そのものにも印をつける（次にどこを打ったか分かるように）
+    roiDraft.forEach((pt,i)=>{
+      const p=toScreen(pt);
+      ctx.beginPath(); ctx.arc(p.x,p.y,i===0?7:5,0,7);
+      ctx.fillStyle= i===0 ? '#FFD400' : '#00C6FF';
+      ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle='#04222B'; ctx.stroke();
+    });
   }
   if(roi && roi.points && roi.points.length>2){
     // 範囲の外側を暗くする（囲んだ形の外だけ塗る）
@@ -303,13 +325,6 @@ let start=null, moved=false, pinch=null;
 
 cv.addEventListener('pointerdown',e=>{
   cv.setPointerCapture(e.pointerId);
-  const rc=cv.getBoundingClientRect();
-  const sx=e.clientX-rc.left, sy=e.clientY-rc.top;
-  if(roiMode){
-    roiDraft=[toImage(sx,sy)];
-    draw();
-    return;
-  }
   pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(pts.size===1){ start={x:e.clientX,y:e.clientY}; moved=false; }
   else if(pts.size===2){
@@ -319,18 +334,6 @@ cv.addEventListener('pointerdown',e=>{
   }
 });
 cv.addEventListener('pointermove',e=>{
-  if(roiDraft){
-    const r=cv.getBoundingClientRect();
-    const p=toImage(e.clientX-r.left, e.clientY-r.top);
-    const last=roiDraft[roiDraft.length-1];
-    // 点が多すぎて重くならないよう、近すぎる点は間引く
-    if(Math.hypot((p.x-last.x)*view.s,(p.y-last.y)*view.s) > 3){
-      roiDraft.push(p);
-      if(roiDraft.length>400) roiDraft.shift();
-      draw();
-    }
-    return;
-  }
   if(!pts.has(e.pointerId)||!img) return;
   const prev=pts.get(e.pointerId);
   pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
@@ -352,24 +355,6 @@ cv.addEventListener('pointermove',e=>{
   }
 });
 function up(e){
-  if(roiDraft){
-    roiMode=false;
-    if(roiDraft.length>=3){
-      let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
-      for(const p of roiDraft){ x0=Math.min(x0,p.x); y0=Math.min(y0,p.y); x1=Math.max(x1,p.x); y1=Math.max(y1,p.y); }
-      if(x1-x0>10 && y1-y0>10){
-        roi={points:roiDraft, x0,y0,x1,y1};
-        autoMsg.textContent='範囲を指定しました。「自動」を押すと数えられます。';
-      }else{
-        autoMsg.textContent='範囲が小さすぎます。もう一度囲んでください。';
-      }
-    }else{
-      autoMsg.textContent='範囲が小さすぎます。もう一度囲んでください。';
-    }
-    roiDraft=null;
-    document.getElementById('roiAll').classList.toggle('hide', !roi);
-    draw(); return;
-  }
   if(!pts.has(e.pointerId)) return;
   pts.delete(e.pointerId);
   if(pts.size===0){
@@ -386,6 +371,12 @@ cv.addEventListener('pointercancel',up);
 function tap(x,y){
   const r=cv.getBoundingClientRect();
   const sx=x-r.left, sy=y-r.top;
+  if(roiMode){
+    roiDraft.push(toImage(sx,sy));
+    updateRoiBanner();
+    draw();
+    return;
+  }
   if(eraseMode){
     const hit=Math.max(markR+10,24);
     for(let i=marks.length-1;i>=0;i--){
@@ -444,7 +435,7 @@ async function load(file){
     if(curURL) URL.revokeObjectURL(curURL);
     img=bmp; curURL=url;
     marks=[]; view={s:1,x:0,y:0}; updateCount();
-    gdata=null; roi=null; roiMode=false; roiDraft=null; guide=false;
+    gdata=null; roi=null; roiMode=false; roiDraft=[]; guide=false;
     logR=0;
     document.getElementById('autoPanel').classList.add('hide');
     eraseMode=false;
@@ -459,7 +450,7 @@ async function load(file){
     resize(); fitView(); placePanels();
     loadAI().then(ok=>{
       const v=document.getElementById('ver');
-      v.textContent = ok ? 'v11 AI ○' : 'v11 AI ×';
+      v.textContent = ok ? 'v12 AI ○' : 'v12 AI ×';
       v.style.color = ok ? '#7CFF3B' : '#FF8A5C';
     });
   }finally{
@@ -548,7 +539,7 @@ drawPreview();
    ・多スケールのLoG（丸検出）で中心を拾う
    通信もライブラリも不要。 */
 let gdata=null;                 // 縮小画像のキャッシュ
-let roi=null, roiMode=false, roiDraft=null;   // roi.points は手描きの輪郭（画像座標）
+let roi=null, roiMode=false, roiDraft=[];   // roi.points は指でタップして作った輪郭（画像座標）
 
 /* 手描きの輪郭を、指定した幅・高さの塗り絵として焼き込む。
    1(内側)/0(外側)の判定に、ピクセルごとの計算ではなくCanvasの塗りつぶしを使う（速い）。 */
@@ -916,13 +907,55 @@ async function runAuto(){
 document.getElementById('auto').onclick=openAuto;
 document.getElementById('redo').onclick=runAuto;
 document.getElementById('autoClose').onclick=()=>{ autoPanel.classList.add('hide'); guide=false; draw(); };
-document.getElementById('roiBtn').onclick=()=>{
-  roiMode=true; roiDraft=null;
-  autoMsg.textContent='数えたい範囲の輪郭を指でなぞってください。囲み終えたら指を離します。';
-  autoPanel.classList.add('hide');   // 写真がよく見えるよう、囲んでいる間はパネルをどかす
+
+/* ================= 範囲を指でタップして囲む =================
+   1点ずつタップして角を置いていく方式。指を動かしても点を打つまでは
+   写真の拡大・移動がそのまま使える（普段のピンチ・ドラッグと共存）。 */
+const roiBanner=document.getElementById('roiBanner');
+const roiMsgEl=document.getElementById('roiMsg');
+const roiCountEl=document.getElementById('roiCount');
+const roiUndoBtn=document.getElementById('roiUndo');
+const roiFinishBtn=document.getElementById('roiFinish');
+
+function updateRoiBanner(){
+  const n=roiDraft.length;
+  roiCountEl.textContent = n===0 ? 'まだ0点' : `${n}点　（3点以上で決定できます）`;
+  roiMsgEl.textContent = n===0
+    ? '写真の上を指でタップして、範囲の角を順番に囲んでください'
+    : '続けてタップして角を足してください。指を動かせば拡大・移動もできます';
+  roiUndoBtn.disabled = n===0;
+  roiFinishBtn.disabled = n<3;
+}
+function startRoi(){
+  roiMode=true; roiDraft=[];
+  autoPanel.classList.add('hide');
+  roiBanner.classList.remove('hide');
+  updateRoiBanner();
+  draw();
+}
+function endRoi(){
+  roiMode=false; roiDraft=[];
+  roiBanner.classList.add('hide');
+  autoPanel.classList.remove('hide'); placePanels();
+  draw();
+}
+document.getElementById('roiBtn').onclick=startRoi;
+roiUndoBtn.onclick=()=>{ roiDraft.pop(); updateRoiBanner(); draw(); };
+document.getElementById('roiCancel').onclick=()=>{
+  autoMsg.textContent='範囲の指定をやめました。';
+  endRoi();
+};
+roiFinishBtn.onclick=()=>{
+  if(roiDraft.length<3) return;
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  for(const p of roiDraft){ x0=Math.min(x0,p.x); y0=Math.min(y0,p.y); x1=Math.max(x1,p.x); y1=Math.max(y1,p.y); }
+  roi={points:roiDraft.slice(), x0,y0,x1,y1};
+  document.getElementById('roiAll').classList.remove('hide');
+  autoMsg.textContent='範囲を指定しました。「自動」を押すと数えられます。';
+  endRoi();
 };
 document.getElementById('roiAll').onclick=()=>{
-  roi=null; roiMode=false; roiDraft=null;
+  roi=null; roiMode=false; roiDraft=[];
   document.getElementById('roiAll').classList.add('hide');
   autoMsg.textContent='範囲を解除しました。写真全体から数えます。'; draw();
 };
