@@ -67,7 +67,11 @@
     border-radius:10px;padding:9px 4px;font-size:11.5px;}
   .sub:active{color:#00C6FF;border-color:#2A5A6B;}
   .act.ghost2{background:var(--bark-2);color:#00C6FF;border:1px solid #2A5A6B;}
-  #guessVal,#confVal{width:46px;text-align:right;font-size:12px;color:var(--sawn-dim);}
+  #guessVal{width:46px;text-align:right;font-size:12px;color:var(--sawn-dim);}
+  #confBtns{flex:1;display:flex;gap:6px;}
+  .confBtn{flex:1;background:var(--bark-2);color:var(--sawn-dim);border:1px solid var(--line);
+    border-radius:9px;padding:9px 2px;font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums;}
+  .confBtn.on{background:var(--paint);color:#1E1610;border-color:var(--paint);}
   #bar button.on{border-color:var(--paint);color:var(--paint);}
   #bar button.erasing{background:#7A1D12;border-color:#FF6B4A;color:#FFD9CF;}
   #eraseBanner{position:fixed;left:0;right:0;top:0;padding:calc(6px + env(safe-area-inset-top)) 8px 6px;
@@ -103,7 +107,7 @@
 <div id="stage"><canvas id="cv"></canvas></div>
 
 <div id="count" class="hide"><b id="num">0</b><span>本</span></div>
-<div id="ver">v10 AI</div>
+<div id="ver">v11 AI</div>
 
 <div id="empty">
   <h1>原木カウンター</h1>
@@ -148,8 +152,7 @@
   <div id="autoMsg">だいたいの本数を合わせて「数える」を押してください。</div>
   <div class="row hide" id="aiRow">
     <span class="lab">厳しさ</span>
-    <input type="range" id="conf" min="10" max="50" step="1" value="18">
-    <span id="confVal">0.18</span>
+    <div id="confBtns"></div>
   </div>
   <div class="row" id="guessRow">
     <span class="lab">本数</span>
@@ -257,24 +260,30 @@ function draw(){
       ctx.fillStyle=tc; ctx.fillText(i+1,p.x,p.y+1);
     }
   });
-  if(roi){
-    const a=toScreen({x:roi.x0,y:roi.y0}), b=toScreen({x:roi.x1,y:roi.y1});
-    // 範囲の外側を暗くして、どこを数えるか分かりやすくする
-    ctx.fillStyle='rgba(10,7,5,.45)';
-    ctx.fillRect(0,0,cv.clientWidth,a.y);
-    ctx.fillRect(0,b.y,cv.clientWidth,cv.clientHeight-b.y);
-    ctx.fillRect(0,a.y,a.x,b.y-a.y);
-    ctx.fillRect(b.x,a.y,cv.clientWidth-b.x,b.y-a.y);
-    ctx.setLineDash([8,6]); ctx.lineWidth=2; ctx.strokeStyle='#00C6FF';
-    ctx.strokeRect(a.x,a.y,b.x-a.x,b.y-a.y); ctx.setLineDash([]);
-    // つまみ（角4つ + 辺の中央4つ）
-    for(const hp of handlePts()){
-      const p=toScreen(hp);
-      ctx.beginPath(); ctx.arc(p.x,p.y,HR,0,7);
-      ctx.fillStyle= hp.k===dragH ? '#00C6FF' : 'rgba(0,198,255,.85)';
-      ctx.fill();
-      ctx.lineWidth=2; ctx.strokeStyle='#04222B'; ctx.stroke();
-    }
+  // 描いている途中の線
+  if(roiDraft && roiDraft.length>1){
+    ctx.beginPath();
+    const p0=toScreen(roiDraft[0]); ctx.moveTo(p0.x,p0.y);
+    for(let i=1;i<roiDraft.length;i++){ const p=toScreen(roiDraft[i]); ctx.lineTo(p.x,p.y); }
+    ctx.lineWidth=3; ctx.strokeStyle='#00C6FF'; ctx.lineJoin='round'; ctx.lineCap='round'; ctx.stroke();
+  }
+  if(roi && roi.points && roi.points.length>2){
+    // 範囲の外側を暗くする（囲んだ形の外だけ塗る）
+    ctx.save();
+    ctx.fillStyle='rgba(10,7,5,.5)';
+    ctx.fillRect(0,0,cv.clientWidth,cv.clientHeight);
+    ctx.globalCompositeOperation='destination-out';
+    ctx.beginPath();
+    const q0=toScreen(roi.points[0]); ctx.moveTo(q0.x,q0.y);
+    for(let i=1;i<roi.points.length;i++){ const p=toScreen(roi.points[i]); ctx.lineTo(p.x,p.y); }
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+    // 囲んだ形の輪郭
+    ctx.beginPath();
+    ctx.moveTo(q0.x,q0.y);
+    for(let i=1;i<roi.points.length;i++){ const p=toScreen(roi.points[i]); ctx.lineTo(p.x,p.y); }
+    ctx.closePath();
+    ctx.setLineDash([8,6]); ctx.lineWidth=2.5; ctx.strokeStyle='#00C6FF'; ctx.stroke(); ctx.setLineDash([]);
   }
   if(false&&guide&&logR){
     const rr=logR*view.s, cx=cv.clientWidth/2, cy=cv.clientHeight/2;
@@ -296,22 +305,9 @@ cv.addEventListener('pointerdown',e=>{
   cv.setPointerCapture(e.pointerId);
   const rc=cv.getBoundingClientRect();
   const sx=e.clientX-rc.left, sy=e.clientY-rc.top;
-  // 枠があるときは、つまみを優先してつかむ（囲み直さなくても微調整できる）
-  if(roi && !roiMode){
-    const k=hitHandle(sx,sy);
-    if(k && k!=='move'){
-      dragH=k; roiDrag={last:toImage(sx,sy)}; draw(); return;
-    }
-  }
   if(roiMode){
-    const p=toImage(sx,sy);
-    // 既に枠があり、つまみをつかんだ場合はそれを動かす
-    if(roi){
-      const k=hitHandle(sx,sy);
-      if(k){ dragH=k; roiDrag={last:p}; draw(); return; }
-    }
-    dragH='new'; roiDrag={x0:p.x,y0:p.y};
-    roi={x0:p.x,y0:p.y,x1:p.x,y1:p.y}; draw();
+    roiDraft=[toImage(sx,sy)];
+    draw();
     return;
   }
   pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
@@ -323,17 +319,17 @@ cv.addEventListener('pointerdown',e=>{
   }
 });
 cv.addEventListener('pointermove',e=>{
-  if(roiDrag){
+  if(roiDraft){
     const r=cv.getBoundingClientRect();
     const p=toImage(e.clientX-r.left, e.clientY-r.top);
-    if(dragH==='new'){
-      roi={x0:Math.min(roiDrag.x0,p.x),y0:Math.min(roiDrag.y0,p.y),
-           x1:Math.max(roiDrag.x0,p.x),y1:Math.max(roiDrag.y0,p.y)};
-    }else if(dragH){
-      moveHandle(dragH, p.x, p.y, p.x-roiDrag.last.x, p.y-roiDrag.last.y);
-      roiDrag.last=p;
+    const last=roiDraft[roiDraft.length-1];
+    // 点が多すぎて重くならないよう、近すぎる点は間引く
+    if(Math.hypot((p.x-last.x)*view.s,(p.y-last.y)*view.s) > 3){
+      roiDraft.push(p);
+      if(roiDraft.length>400) roiDraft.shift();
+      draw();
     }
-    draw(); return;
+    return;
   }
   if(!pts.has(e.pointerId)||!img) return;
   const prev=pts.get(e.pointerId);
@@ -356,15 +352,22 @@ cv.addEventListener('pointermove',e=>{
   }
 });
 function up(e){
-  if(roiDrag){
-    const wasNew = dragH==='new';
-    roiDrag=null; dragH=null; roiMode=false;
-    if(roi&&(roi.x1-roi.x0<10||roi.y1-roi.y0<10)) roi=null;
+  if(roiDraft){
+    roiMode=false;
+    if(roiDraft.length>=3){
+      let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+      for(const p of roiDraft){ x0=Math.min(x0,p.x); y0=Math.min(y0,p.y); x1=Math.max(x1,p.x); y1=Math.max(y1,p.y); }
+      if(x1-x0>10 && y1-y0>10){
+        roi={points:roiDraft, x0,y0,x1,y1};
+        autoMsg.textContent='範囲を指定しました。「自動」を押すと数えられます。';
+      }else{
+        autoMsg.textContent='範囲が小さすぎます。もう一度囲んでください。';
+      }
+    }else{
+      autoMsg.textContent='範囲が小さすぎます。もう一度囲んでください。';
+    }
+    roiDraft=null;
     document.getElementById('roiAll').classList.toggle('hide', !roi);
-    if(roi) autoMsg.textContent = wasNew
-      ? '範囲を指定しました。青い点をつまむと微調整できます。「自動」を押すと数えられます。'
-      : '範囲を調整しました。「自動」を押すと数えられます。';
-    else autoMsg.textContent='範囲が小さすぎます。もう一度囲んでください。';
     draw(); return;
   }
   if(!pts.has(e.pointerId)) return;
@@ -441,7 +444,7 @@ async function load(file){
     if(curURL) URL.revokeObjectURL(curURL);
     img=bmp; curURL=url;
     marks=[]; view={s:1,x:0,y:0}; updateCount();
-    gdata=null; roi=null; roiMode=false; roiDrag=null; dragH=null; guide=false;
+    gdata=null; roi=null; roiMode=false; roiDraft=null; guide=false;
     logR=0;
     document.getElementById('autoPanel').classList.add('hide');
     eraseMode=false;
@@ -456,7 +459,7 @@ async function load(file){
     resize(); fitView(); placePanels();
     loadAI().then(ok=>{
       const v=document.getElementById('ver');
-      v.textContent = ok ? 'v10 AI ○' : 'v10 AI ×';
+      v.textContent = ok ? 'v11 AI ○' : 'v11 AI ×';
       v.style.color = ok ? '#7CFF3B' : '#FF8A5C';
     });
   }finally{
@@ -545,42 +548,18 @@ drawPreview();
    ・多スケールのLoG（丸検出）で中心を拾う
    通信もライブラリも不要。 */
 let gdata=null;                 // 縮小画像のキャッシュ
-let roi=null, roiMode=false, roiDrag=null;
-let dragH=null;            // つかんでいるつまみ（'nw','n','ne','e','se','s','sw','w','move'）
-const HR=8;                // つまみの半径(画面px)
+let roi=null, roiMode=false, roiDraft=null;   // roi.points は手描きの輪郭（画像座標）
 
-/* 枠のつまみの位置。角4つと辺の中央4つ。 */
-function handlePts(){
-  if(!roi) return [];
-  const mx=(roi.x0+roi.x1)/2, my=(roi.y0+roi.y1)/2;
-  return [
-    {k:'nw',x:roi.x0,y:roi.y0}, {k:'n',x:mx,y:roi.y0}, {k:'ne',x:roi.x1,y:roi.y0},
-    {k:'w', x:roi.x0,y:my},                            {k:'e',x:roi.x1,y:my},
-    {k:'sw',x:roi.x0,y:roi.y1}, {k:'s',x:mx,y:roi.y1}, {k:'se',x:roi.x1,y:roi.y1}
-  ];
-}
-/* 画面座標がどのつまみに当たるか。枠の内側なら'move'。 */
-function hitHandle(sx,sy){
-  if(!roi) return null;
-  for(const hp of handlePts()){
-    const p=toScreen(hp);
-    if(Math.hypot(p.x-sx,p.y-sy)<HR+9) return hp.k;
-  }
-  const a=toScreen({x:roi.x0,y:roi.y0}), b=toScreen({x:roi.x1,y:roi.y1});
-  if(sx>a.x&&sx<b.x&&sy>a.y&&sy<b.y) return 'move';
-  return null;
-}
-/* つまみを動かして枠を作り直す */
-function moveHandle(k,ix,iy,dx,dy){
-  let {x0,y0,x1,y1}=roi;
-  if(k==='move'){ x0+=dx; x1+=dx; y0+=dy; y1+=dy; }
-  else{
-    if(k.includes('w')) x0=ix;
-    if(k.includes('e')) x1=ix;
-    if(k[0]==='n'||k==='n') y0=iy;
-    if(k[0]==='s'||k==='s') y1=iy;
-  }
-  roi={x0:Math.min(x0,x1), y0:Math.min(y0,y1), x1:Math.max(x0,x1), y1:Math.max(y0,y1)};
+/* 手描きの輪郭を、指定した幅・高さの塗り絵として焼き込む。
+   1(内側)/0(外側)の判定に、ピクセルごとの計算ではなくCanvasの塗りつぶしを使う（速い）。 */
+function rasterizePoly(points, w, h, scaleX, scaleY){
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const g=c.getContext('2d');
+  g.beginPath();
+  g.moveTo(points[0].x*scaleX, points[0].y*scaleY);
+  for(let i=1;i<points.length;i++) g.lineTo(points[i].x*scaleX, points[i].y*scaleY);
+  g.closePath(); g.fillStyle='#fff'; g.fill();
+  return g.getImageData(0,0,w,h).data; // .data[i*4+3] > 0 なら内側
 }
 let logR=0;                     // 木口の半径（元画像の画素）
 let guide=false;                // 大きさの目安の丸を表示中か
@@ -631,15 +610,13 @@ function gaussian(src,w,h,sigma){
 
 function detect(sensV, R){
   const {gray,wood,w,h}=gdata;
-  const inRoi=new Uint8Array(w*h);
-  if(roi){
-    const x0=Math.max(0,Math.round(roi.x0*gdata.sc)), x1=Math.min(w,Math.round(roi.x1*gdata.sc));
-    const y0=Math.max(0,Math.round(roi.y0*gdata.sc)), y1=Math.min(h,Math.round(roi.y1*gdata.sc));
-    for(let y=y0;y<y1;y++) for(let x=x0;x<x1;x++) inRoi[y*w+x]=1;
-  }else inRoi.fill(1);
-
   const mask=new Uint8Array(w*h);
-  for(let i=0;i<w*h;i++) mask[i]=wood[i]&&inRoi[i];
+  if(roi && roi.points && roi.points.length>2){
+    const rd=rasterizePoly(roi.points, w, h, gdata.sc, gdata.sc);
+    for(let i=0;i<w*h;i++) mask[i]=wood[i] && rd[i*4+3]>0 ? 1:0;
+  }else{
+    for(let i=0;i<w*h;i++) mask[i]=wood[i];
+  }
 
   // 日向と日陰の明るさの差をならす（局所正規化）
   const rr=Math.max(2,Math.round(R*1.5));
@@ -788,6 +765,19 @@ function letterbox(){
   const dw=Math.round(sw*r), dh=Math.round(sh*r);
   const dx=Math.floor((AI_SIZE-dw)/2), dy=Math.floor((AI_SIZE-dh)/2);
   g.drawImage(img, sx,sy,sw,sh, dx,dy,dw,dh);
+  // 手描きの範囲がある時は、外側をパディングと同じ灰色で塗りつぶす
+  if(roi && roi.points && roi.points.length>2){
+    g.save();
+    g.beginPath();
+    g.rect(0,0,AI_SIZE,AI_SIZE);
+    g.moveTo(dx+(roi.points[0].x-sx)*r, dy+(roi.points[0].y-sy)*r);
+    for(let i=roi.points.length-1;i>=0;i--)
+      g.lineTo(dx+(roi.points[i].x-sx)*r, dy+(roi.points[i].y-sy)*r);
+    g.closePath();
+    g.fillStyle='#727272';
+    g.fill('evenodd');
+    g.restore();
+  }
   const d=g.getImageData(0,0,AI_SIZE,AI_SIZE).data;
   const n=AI_SIZE*AI_SIZE, f=new Float32Array(3*n);
   for(let i=0,p=0;i<n;i++,p+=4){
@@ -842,8 +832,22 @@ function placePanels(){
   autoPanel.style.bottom=b+'px'; panel.style.bottom=b+'px'; hint.style.bottom=(b+6)+'px';
 }
 guess.addEventListener('input',()=>{ guessVal.textContent=guess.value+'本'; });
-const conf=document.getElementById('conf'), confVal=document.getElementById('confVal');
-conf.addEventListener('input',()=>{ confVal.textContent=(conf.value/100).toFixed(2); });
+
+/* 厳しさをボタン式で選ぶ（0.10〜0.20）。0.18が検証上いちばん良かった値。 */
+const CONF_OPTS=[0.10,0.12,0.14,0.16,0.18,0.20];
+let confValue=0.18;
+const confBtns=document.getElementById('confBtns');
+CONF_OPTS.forEach(v=>{
+  const b=document.createElement('button');
+  b.className='confBtn'+(v===confValue?' on':'');
+  b.textContent=v.toFixed(2);
+  b.onclick=()=>{
+    confValue=v;
+    [...confBtns.children].forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');
+  };
+  confBtns.appendChild(b);
+});
 
 async function openAuto(){
   if(!img) return;
@@ -885,7 +889,7 @@ async function runAuto(){
   try{
     let pts;
     if(aiReady){
-      pts = await runAI(+conf.value/100);
+      pts = await runAI(confValue);
     }else{
       if(!gdata) prepGray();
       const res=searchDetect(+guess.value);
@@ -913,12 +917,12 @@ document.getElementById('auto').onclick=openAuto;
 document.getElementById('redo').onclick=runAuto;
 document.getElementById('autoClose').onclick=()=>{ autoPanel.classList.add('hide'); guide=false; draw(); };
 document.getElementById('roiBtn').onclick=()=>{
-  roiMode=true;
-  autoMsg.textContent='数えたい範囲を指でなぞって囲んでください。囲んだ後は青い点をつまんで微調整できます。';
+  roiMode=true; roiDraft=null;
+  autoMsg.textContent='数えたい範囲の輪郭を指でなぞってください。囲み終えたら指を離します。';
   autoPanel.classList.add('hide');   // 写真がよく見えるよう、囲んでいる間はパネルをどかす
 };
 document.getElementById('roiAll').onclick=()=>{
-  roi=null; roiMode=false; roiDrag=null; dragH=null;
+  roi=null; roiMode=false; roiDraft=null;
   document.getElementById('roiAll').classList.add('hide');
   autoMsg.textContent='範囲を解除しました。写真全体から数えます。'; draw();
 };
@@ -1007,7 +1011,7 @@ document.getElementById('saveData').onclick=()=>{
     settings:{
       log_radius_ratio:+(logR/img.width).toFixed(4),
       mode: aiReady ? "ai" : "cv",
-      conf: aiReady ? +conf.value/100 : null,
+      conf: aiReady ? confValue : null,
       sens:SENS,
       guess:+guess.value,
       roi: roi ? {x0:+(roi.x0/img.width).toFixed(4), y0:+(roi.y0/img.height).toFixed(4),
