@@ -113,7 +113,7 @@
 <div id="stage"><canvas id="cv"></canvas></div>
 
 <div id="count" class="hide"><b id="num">0</b><span>本</span></div>
-<div id="ver">v12 AI</div>
+<div id="ver">v13 AI</div>
 
 <div id="empty">
   <h1>原木カウンター</h1>
@@ -290,16 +290,14 @@ function draw(){
     });
   }
   if(roi && roi.points && roi.points.length>2){
-    // 範囲の外側を暗くする（囲んだ形の外だけ塗る）
-    ctx.save();
-    ctx.fillStyle='rgba(10,7,5,.5)';
-    ctx.fillRect(0,0,cv.clientWidth,cv.clientHeight);
-    ctx.globalCompositeOperation='destination-out';
+    // 「全体の四角」から「囲んだ形」をくり抜いて塗る＝外側だけが暗くなる（合成モードを使わない確実な方法）
     ctx.beginPath();
+    ctx.rect(0,0,cv.clientWidth,cv.clientHeight);
     const q0=toScreen(roi.points[0]); ctx.moveTo(q0.x,q0.y);
     for(let i=1;i<roi.points.length;i++){ const p=toScreen(roi.points[i]); ctx.lineTo(p.x,p.y); }
-    ctx.closePath(); ctx.fill();
-    ctx.restore();
+    ctx.closePath();
+    ctx.fillStyle='rgba(10,7,5,.55)';
+    ctx.fill('evenodd');
     // 囲んだ形の輪郭
     ctx.beginPath();
     ctx.moveTo(q0.x,q0.y);
@@ -450,7 +448,7 @@ async function load(file){
     resize(); fitView(); placePanels();
     loadAI().then(ok=>{
       const v=document.getElementById('ver');
-      v.textContent = ok ? 'v12 AI ○' : 'v12 AI ×';
+      v.textContent = ok ? 'v13 AI ○' : 'v13 AI ×';
       v.style.color = ok ? '#7CFF3B' : '#FF8A5C';
     });
   }finally{
