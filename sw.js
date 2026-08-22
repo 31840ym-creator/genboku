@@ -4,7 +4,7 @@
    ・外部サイト(AIライブラリのCDNなど)には一切手を出さない。
      横取りすると読み込みに失敗することがあるため、ブラウザに任せる。
    ・失敗した応答は保存しない。 */
-const CACHE = 'genboku-v15';
+const CACHE = 'genboku-v16';
 const FILES = ['./', './index.html', './manifest.json', './icon.png'];
 
 self.addEventListener('install', e => {
@@ -25,10 +25,15 @@ self.addEventListener('fetch', e => {
   /* 外部サイトには触らない（ここが今までの不具合の原因） */
   if (url.origin !== self.location.origin) return;
 
-  /* index.html は必ず新しいものを取りに行く */
+  /* index.html は必ず新しいものを取りに行く。
+
+     GitHub Pages は「10分間は取り直さなくてよい」という指示を付けて返してくる。
+     普通に取りに行くとブラウザがその指示に従い、更新しても最大10分は
+     古い画面のままになる。cache:'reload' を付けると、その指示を無視して
+     必ずサーバに聞きに行く。圏外の時は下の catch で保存庫から出す。 */
   if (url.pathname.endsWith('/') || url.pathname.endsWith('index.html')) {
     e.respondWith(
-      fetch(e.request).then(res => {
+      fetch(new Request(e.request.url, {cache: 'reload'})).then(res => {
         if (res && res.ok) {
           const copy = res.clone();
           caches.open(CACHE).then(c => c.put(e.request, copy)).catch(()=>{});
