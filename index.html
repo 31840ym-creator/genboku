@@ -89,6 +89,12 @@
   #panel{position:fixed;left:8px;right:8px;bottom:calc(84px + env(safe-area-inset-bottom));
     background:rgba(38,30,22,.97);border:1px solid var(--line);border-radius:16px;
     padding:14px 16px 16px;backdrop-filter:blur(8px);}
+  /* パネル上部の摘み。タップするか、下へ引き下げると閉じる */
+  .grab{height:26px;margin:-12px -16px 2px;display:flex;align-items:center;
+    justify-content:center;touch-action:none;cursor:grab;}
+  .grab::before{content:'';width:46px;height:5px;border-radius:3px;
+    background:var(--line);transition:background .15s,width .15s;}
+  .grab.hot::before{background:var(--paint);width:56px;}
   .row{display:flex;align-items:center;gap:12px;}
   .row+.row{margin-top:14px;}
   .lab{font-size:12px;color:var(--sawn-dim);width:52px;flex:none;letter-spacing:.06em;}
@@ -126,6 +132,7 @@
 <div id="hint" class="hide">2本指で拡大・移動／消すときは「消す」をオンに</div>
 
 <div id="panel" class="hide">
+  <div class="grab" aria-label="つまんで下げると閉じます"></div>
   <div class="row">
     <span class="lab">色</span>
     <div id="swatches"></div>
@@ -157,6 +164,7 @@
 </div>
 
 <div id="autoPanel" class="hide">
+  <div class="grab" aria-label="つまんで下げると閉じます"></div>
   <div id="autoMsg">だいたいの本数を合わせて「数える」を押してください。</div>
   <div class="row hide" id="aiRow">
     <span class="lab">数え方</span>
@@ -170,22 +178,21 @@
   </div>
   <div class="row" style="gap:8px">
     <button id="redo" class="act">数える</button>
-    <button id="autoClose" class="act ghost">閉じる</button>
   </div>
   <div class="row" style="margin-top:10px">
-    <button id="roiBtn" class="sub">背景にも丸太が写る時は範囲を囲む</button>
+    <button id="roiBtn" class="sub">範囲を囲う</button>
     <button id="roiAll" class="sub hide">範囲を解除</button>
   </div>
 </div>
 
 <div id="savePanel" class="hide">
+  <div class="grab" aria-label="つまんで下げると閉じます"></div>
   <div id="saveMsg">保存の種類を選んでください。</div>
   <div class="row" style="gap:8px">
     <button id="savePng" class="act">画像を保存</button>
   </div>
   <div class="row" style="gap:8px">
     <button id="saveData" class="act ghost2">学習データを保存</button>
-    <button id="saveClose" class="act ghost">閉じる</button>
   </div>
 </div>
 
@@ -205,7 +212,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v19';
+const APP_VER='v20';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -936,9 +943,19 @@ async function runAuto(){
     busy.classList.add('hide'); busy.textContent='写真を読み込み中…';
   }
 }
-document.getElementById('auto').onclick=openAuto;
+const autoBtn=document.getElementById('auto');
+function closeAuto(){
+  autoPanel.classList.add('hide');
+  autoBtn.classList.remove('on');
+  guide=false; draw();
+}
+/* 「見た目」と同じで、もう一度押せば閉じる */
+autoBtn.onclick=()=>{
+  if(!autoPanel.classList.contains('hide')){ closeAuto(); return; }
+  autoBtn.classList.add('on');
+  openAuto();
+};
 document.getElementById('redo').onclick=runAuto;
-document.getElementById('autoClose').onclick=()=>{ autoPanel.classList.add('hide'); guide=false; draw(); };
 
 /* ================= 範囲を指でタップして囲む =================
    1点ずつタップして角を置いていく方式。指を動かしても点を打つまでは
@@ -994,17 +1011,19 @@ document.getElementById('roiAll').onclick=()=>{
 
 /* ---- 印つき画像を保存 ---- */
 const savePanel=document.getElementById('savePanel');
-document.getElementById('save').onclick=()=>{
+const saveBtn=document.getElementById('save');
+function closeSave(){ savePanel.classList.add('hide'); saveBtn.classList.remove('on'); }
+saveBtn.onclick=()=>{
   if(!img) return;
+  if(!savePanel.classList.contains('hide')){ closeSave(); return; }
   document.getElementById('saveMsg').innerHTML=
     `現在 <b style="color:var(--paint)">${marks.length}本</b>。画像は印つきのPNG、学習データは写真とタップ位置をまとめたファイルです。`;
-  savePanel.classList.remove('hide'); placePanels();
+  savePanel.classList.remove('hide'); saveBtn.classList.add('on'); placePanels();
 };
-document.getElementById('saveClose').onclick=()=>savePanel.classList.add('hide');
 document.getElementById('savePng').onclick=()=>{
   if(!img) return;
   if(!confirm(`${marks.length}本として画像を保存しますか？`)) return;
-  savePanel.classList.add('hide');
+  closeSave();
   const c=document.createElement('canvas');
   c.width=img.width; c.height=img.height;
   const g=c.getContext('2d');
@@ -1086,7 +1105,7 @@ document.getElementById('saveData').onclick=()=>{
   };
   const blob=new Blob([JSON.stringify(rec)],{type:'application/json'});
   downloadBlob(blob, `genboku_${stamp()}_${marks.length}hon.json`);
-  savePanel.classList.add('hide');
+  closeSave();
   const mb=(blob.size/1048576).toFixed(1);
   setTimeout(()=>alert(`学習データを保存しました（約${mb}MB）。\n\nダウンロードフォルダに貯まります。定期的にパソコンやクラウドへ移してください。`),300);
 };
@@ -1106,6 +1125,45 @@ if(location.search.includes('reset')){
     navigator.serviceWorker.register('sw.js').catch(e=>console.log('sw:',e));
   });
 }
+
+/* ================= パネル上部の摘み =================
+   タップするか、下へ引き下げると閉じる。
+   どのパネルも閉じ方は同じにしてある。 */
+function bindGrab(panelEl, closeFn){
+  const g=panelEl.querySelector('.grab');
+  if(!g) return;
+  let id=null, y0=0, moved=0;
+
+  g.addEventListener('pointerdown', e=>{
+    id=e.pointerId; y0=e.clientY; moved=0;
+    g.classList.add('hot');
+    g.setPointerCapture(id);
+    e.preventDefault();
+  });
+
+  g.addEventListener('pointermove', e=>{
+    if(e.pointerId!==id) return;
+    moved=e.clientY-y0;
+    // 下へ引いた分だけパネルも下がって、閉じる手応えが出る
+    panelEl.style.transform = moved>0 ? `translateY(${moved}px)` : '';
+    if(moved>70) g.classList.remove('hot');
+  });
+
+  function finish(e){
+    if(e.pointerId!==id) return;
+    id=null;
+    g.classList.remove('hot');
+    panelEl.style.transform='';
+    // 指をほとんど動かさなければタップ、下へ70px以上引けば引き下げ
+    if(Math.abs(moved)<8 || moved>70) closeFn();
+  }
+  g.addEventListener('pointerup', finish);
+  g.addEventListener('pointercancel', finish);
+}
+
+bindGrab(autoPanel, closeAuto);
+bindGrab(savePanel, closeSave);
+bindGrab(panel, ()=>{ panel.classList.add('hide'); lookBtn.classList.remove('on'); });
 
 resize();
 </script>
