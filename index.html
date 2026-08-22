@@ -107,8 +107,12 @@
     border-radius:999px;padding:8px 16px;font-size:12px;font-weight:600;}
   #togNum.on,#togSnd.on{color:var(--paint);border-color:var(--paint);}
 
+  /* 写真の上に少しの間だけ出る知らせ。どんな写真の上でも読めるよう帯を敷く */
   #hint{position:fixed;left:0;right:0;bottom:88px;text-align:center;font-size:12px;
-    color:var(--sawn-dim);pointer-events:none;transition:opacity .4s;}
+    color:var(--sawn-dim);pointer-events:none;transition:opacity .4s;padding:0 10px;}
+  #hint span{display:inline-block;background:rgba(30,22,16,.94);border:1px solid var(--line);
+    border-radius:999px;padding:7px 15px;line-height:1.5;max-width:100%;
+    backdrop-filter:blur(6px);}
   #busy{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
     background:rgba(30,22,16,.7);font-size:14px;color:var(--sawn-dim);}
   input[type=file]{display:none;}
@@ -212,7 +216,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v20';
+const APP_VER='v21';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -458,8 +462,7 @@ async function load(file){
     emptyBox.classList.add('hide');
     bar.classList.remove('hide');
     countBox.classList.remove('hide');
-    hint.classList.remove('hide'); hint.style.opacity=1;
-    setTimeout(()=>hint.style.opacity=0,4000);
+    flash('2本指で拡大・移動／消すときは「消す」をオンに', 4000);
     resize(); fitView(); placePanels();
     loadAI().then(ok=>{
       const v=document.getElementById('ver');
@@ -909,6 +912,17 @@ function searchDetect(n){
   return best;
 }
 
+/* 画面下に少しの間だけ出る知らせ。写真の邪魔をしないよう自動で消える */
+let flashTimer=null;
+function flash(msg, ms=5000){
+  hint.innerHTML='<span>'+msg+'</span>';
+  hint.classList.remove('hide');
+  hint.style.opacity=1;
+  placePanels();                       // 下のバーの高さに合わせて位置を決める
+  clearTimeout(flashTimer);
+  flashTimer=setTimeout(()=>hint.style.opacity=0, ms);
+}
+
 async function runAuto(){
   if(!img) return;
   if(marks.length && !confirm('今の印を消して数え直しますか？')) return;
@@ -933,8 +947,10 @@ async function runAuto(){
     guide=false; updateCount();
     roi=null; document.getElementById('roiAll').classList.add('hide');
     draw();
-    autoMsg.innerHTML=`<b>${marks.length}本</b> 検出（${((performance.now()-t0)/1000).toFixed(1)}秒）<br>`+
-      `抜けはタップで追加、余分は「消す」で削除してください。`;
+    // 数え終わったら写真を確かめたいので、パネルは畳んで写真を見せる
+    closeAuto();
+    flash(`<b style="color:var(--paint)">${marks.length}本</b> 検出（${((performance.now()-t0)/1000).toFixed(1)}秒）`+
+      `　抜けはタップで追加、余分は「消す」で削除`);
     beep('ten');
   }catch(err){
     console.error(err);
