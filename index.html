@@ -670,8 +670,9 @@ function detect(sensV, R){
 
 
 /* ================= 学習済みモデル(AI)で数える =================
-   genboku_v2.onnx が同じ場所に置いてあれば、そちらを使う。
+   モデルが同じ場所に置いてあれば、そちらを使う。
    無ければ従来の画像処理に自動で切り替わる。 */
+const MODEL_FILE='./genboku_yolox_int8.onnx';  // 差し替える時はここだけ変える
 const AI_SIZE=960;                 // 学習時と同じ大きさ
 
 /* AIライブラリの候補。
@@ -730,7 +731,7 @@ async function loadAI(){
   try{
     ort.env.wasm.wasmPaths=base;
     ort.env.wasm.numThreads=1;
-    const res=await fetch('./genboku_v3.onnx');
+    const res=await fetch(MODEL_FILE);
     if(!res.ok) throw new Error('モデルHTTP '+res.status);
     const buf=new Uint8Array(await res.arrayBuffer());
     if(buf.length<1000) throw new Error('モデルが小さい('+buf.length+')');
@@ -743,7 +744,11 @@ async function loadAI(){
   return aiReady;
 }
 
-/* 写真を960x960の正方形に収める（余白は灰色で埋める） */
+/* 写真を960x960の正方形に収める（余白は灰色で埋める）。
+
+   YOLOXは【左上に詰めて・0〜255のまま・青緑赤(BGR)の順】で学習している。
+   ここを間違えても画面にエラーは出ず、本数だけが静かにズレる。
+   実測では色の順を間違えるだけで平均のズレが0.56本→0.71本に悪化した。 */
 function letterbox(){
   const c=document.createElement('canvas'); c.width=AI_SIZE; c.height=AI_SIZE;
   const g=c.getContext('2d',{willReadFrequently:true});
@@ -752,7 +757,7 @@ function letterbox(){
   const sw=roi?(roi.x1-roi.x0):img.width, sh=roi?(roi.y1-roi.y0):img.height;
   const r=Math.min(AI_SIZE/sw, AI_SIZE/sh);
   const dw=Math.round(sw*r), dh=Math.round(sh*r);
-  const dx=Math.floor((AI_SIZE-dw)/2), dy=Math.floor((AI_SIZE-dh)/2);
+  const dx=0, dy=0;                       // 中央ではなく左上に詰める
   g.drawImage(img, sx,sy,sw,sh, dx,dy,dw,dh);
   // 手描きの範囲がある時は、外側をパディングと同じ灰色で塗りつぶす
   if(roi && roi.points && roi.points.length>2){
@@ -770,19 +775,25 @@ function letterbox(){
   const d=g.getImageData(0,0,AI_SIZE,AI_SIZE).data;
   const n=AI_SIZE*AI_SIZE, f=new Float32Array(3*n);
   for(let i=0,p=0;i<n;i++,p+=4){
-    f[i]=d[p]/255; f[n+i]=d[p+1]/255; f[2*n+i]=d[p+2]/255;
+    f[i]=d[p+2]; f[n+i]=d[p+1]; f[2*n+i]=d[p];   // 青・緑・赤の順。255で割らない
   }
   return {data:f, r, dx, dy, sx, sy};
 }
 
-/* モデルの出力から、重なりを整理して木口の中心を取り出す */
+/* モデルの出力から、重なりを整理して木口の中心を取り出す。
+
+   出力は [1, 18900, 6] の形。18900個の候補それぞれに6つの数字が並ぶ:
+     [中心x, 中心y, 幅, 高さ, 物体らしさ, 木口らしさ]
+   厳しさと比べるのは「物体らしさ × 木口らしさ」。
+   箱の位置はすでに960の中の座標になっている（計算し直す必要はない）。 */
 function decodeAI(out, m, conf){
-  const d=out.data, N=out.dims[2];
+  const d=out.data, N=out.dims[1];
   const cand=[];
   for(let i=0;i<N;i++){
-    const s=d[4*N+i];
+    const o=i*6;
+    const s=d[o+4]*d[o+5];
     if(s<conf) continue;
-    const cx=d[i], cy=d[N+i], w=d[2*N+i], h=d[3*N+i];
+    const cx=d[o], cy=d[o+1], w=d[o+2], h=d[o+3];
     cand.push({s,cx,cy,x1:cx-w/2,y1:cy-h/2,x2:cx+w/2,y2:cy+h/2});
   }
   cand.sort((a,b)=>b.s-a.s);
@@ -822,9 +833,11 @@ function placePanels(){
 }
 guess.addEventListener('input',()=>{ guessVal.textContent=guess.value+'本'; });
 
-/* 厳しさをボタン式で選ぶ（0.10〜0.20）。0.18が検証上いちばん良かった値。 */
-const CONF_OPTS=[0.10,0.12,0.14,0.16,0.18,0.20];
-let confValue=0.18;
+/* 厳しさをボタン式で選ぶ。検証41枚では0.20〜0.30がほぼ同じ成績で、
+   釣り合いが良かった0.25を初期値にしている。
+   多く出すぎる時は上げ、抜けが多い時は下げる。 */
+const CONF_OPTS=[0.15,0.20,0.25,0.30,0.35,0.40];
+let confValue=0.25;
 const confBtns=document.getElementById('confBtns');
 CONF_OPTS.forEach(v=>{
   const b=document.createElement('button');
