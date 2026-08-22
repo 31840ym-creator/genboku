@@ -70,8 +70,9 @@
   .act.ghost2{background:var(--bark-2);color:#00C6FF;border:1px solid #2A5A6B;}
   #guessVal{width:46px;text-align:right;font-size:12px;color:var(--sawn-dim);}
   #confBtns{flex:1;display:flex;gap:6px;}
+  #confHint{font-size:11px;color:var(--sawn-dim);margin-top:7px;padding-left:64px;line-height:1.5;}
   .confBtn{flex:1;background:var(--bark-2);color:var(--sawn-dim);border:1px solid var(--line);
-    border-radius:9px;padding:9px 2px;font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums;}
+    border-radius:9px;padding:11px 2px;font-size:14px;font-weight:600;}
   .confBtn.on{background:var(--paint);color:var(--paint-ink);border-color:var(--paint);}
   #bar button.on{border-color:var(--paint);color:var(--paint);}
   #bar button.erasing{background:#7A1D12;border-color:#FF6B4A;color:#FFD9CF;}
@@ -158,9 +159,10 @@
 <div id="autoPanel" class="hide">
   <div id="autoMsg">だいたいの本数を合わせて「数える」を押してください。</div>
   <div class="row hide" id="aiRow">
-    <span class="lab">厳しさ</span>
+    <span class="lab">数え方</span>
     <div id="confBtns"></div>
   </div>
+  <div class="hide" id="confHint">抜けが多い時は「多め」、余分が多い時は「少なめ」</div>
   <div class="row" id="guessRow">
     <span class="lab">本数</span>
     <input type="range" id="guess" min="5" max="300" step="1" value="40">
@@ -203,7 +205,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v18';
+const APP_VER='v19';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -839,18 +841,30 @@ function placePanels(){
 }
 guess.addEventListener('input',()=>{ guessVal.textContent=guess.value+'本'; });
 
-/* 厳しさをボタン式で選ぶ。検証41枚では0.20〜0.30がほぼ同じ成績で、
-   釣り合いが良かった0.25を初期値にしている。
-   多く出すぎる時は上げ、抜けが多い時は下げる。 */
-const CONF_OPTS=[0.15,0.20,0.25,0.30,0.35,0.40];
+/* 数え方を3つから選ぶ。
+
+   もとは0.15〜0.40の数値ボタンを6つ並べていたが、モデルの精度が上がって
+   この範囲ではほとんど結果が変わらなくなった(検証41枚で平均のズレは
+   0.51〜0.54本、ぴったり当たるのは31〜34枚)。
+   数字は使う人にとって意味が分かりにくいので、3つの言葉に置き換えた。
+
+   値は実際に検証して選んである:
+     多め   0.20 … 少し多めに出る(偏り +0.2本)
+     ふつう 0.25 … 一番釣り合いが良い(偏り +0.1本、ぴったり34/41枚)
+     少なめ 0.30 … 余分を減らす(偏り 0.0本) */
+const CONF_OPTS=[
+  {v:0.20, label:'多め'},
+  {v:0.25, label:'ふつう'},
+  {v:0.30, label:'少なめ'},
+];
 let confValue=0.25;
 const confBtns=document.getElementById('confBtns');
-CONF_OPTS.forEach(v=>{
+CONF_OPTS.forEach(o=>{
   const b=document.createElement('button');
-  b.className='confBtn'+(v===confValue?' on':'');
-  b.textContent=v.toFixed(2);
+  b.className='confBtn'+(o.v===confValue?' on':'');
+  b.textContent=o.label;
   b.onclick=()=>{
-    confValue=v;
+    confValue=o.v;
     [...confBtns.children].forEach(x=>x.classList.remove('on'));
     b.classList.add('on');
   };
@@ -865,6 +879,7 @@ async function openAuto(){
     await loadAI();
   }
   document.getElementById('aiRow').classList.toggle('hide', !aiReady);
+  document.getElementById('confHint').classList.toggle('hide', !aiReady);
   document.getElementById('guessRow').classList.toggle('hide', aiReady);
   autoMsg.innerHTML = aiReady
     ? 'AIで数えます。「数える」を押してください。'
