@@ -32,6 +32,9 @@
   #count b{font-size:38px;line-height:1;font-weight:800;letter-spacing:-.02em;
     font-variant-numeric:tabular-nums;color:var(--paint);transition:color .15s;}
   #count span{font-size:13px;color:var(--sawn-dim);letter-spacing:.08em;}
+  #calcBtn{align-self:center;margin-left:2px;background:var(--bark-2);border:1px solid var(--line);
+    border-radius:10px;padding:6px 9px;font-size:17px;line-height:1;}
+  #calcBtn.on{border-color:var(--paint);background:#3A2C1F;}
   body.erasing #count{top:calc(38px + env(safe-area-inset-top));}
   #ver{position:fixed;top:calc(12px + env(safe-area-inset-top));right:12px;
     font-size:11px;color:var(--sawn-dim);background:rgba(30,22,16,.8);
@@ -89,6 +92,27 @@
   #panel{position:fixed;left:8px;right:8px;bottom:calc(84px + env(safe-area-inset-bottom));
     background:rgba(38,30,22,.97);border:1px solid var(--line);border-radius:16px;
     padding:14px 16px 16px;backdrop-filter:blur(8px);}
+  /* 電卓。荷台ごとの本数を足したい時などに使う */
+  #calcPanel{position:fixed;left:8px;right:8px;bottom:150px;
+    background:rgba(38,30,22,.97);border:1px solid var(--line);border-radius:16px;
+    padding:14px 16px 16px;backdrop-filter:blur(8px);max-width:420px;margin:0 auto;}
+  #calcExpr{text-align:right;font-size:12px;color:var(--sawn-dim);min-height:18px;
+    font-variant-numeric:tabular-nums;overflow:hidden;white-space:nowrap;}
+  #calcDisp{text-align:right;font-size:34px;font-weight:800;color:var(--sawn);
+    letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-bottom:12px;
+    overflow:hidden;white-space:nowrap;}
+  #calcKeys{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;}
+  .ck{background:var(--bark-2);color:var(--sawn);border:1px solid var(--line);
+    border-radius:11px;padding:13px 2px;font-size:19px;font-weight:600;
+    font-variant-numeric:tabular-nums;}
+  .ck:active{background:#3A2C1F;}
+  .ck.op{color:var(--paint);}
+  .ck.fn{color:var(--sawn-dim);font-size:16px;}
+  .ck.eq{background:var(--paint);color:var(--paint-ink);border-color:var(--paint);
+    grid-row:span 2;}
+  .ck.wide{grid-column:span 2;}
+  #calcUseCount{margin-top:10px;width:100%;}
+
   /* パネル上部の摘み。タップするか、下へ引き下げると閉じる */
   .grab{height:26px;margin:-12px -16px 2px;display:flex;align-items:center;
     justify-content:center;touch-action:none;cursor:grab;}
@@ -124,7 +148,7 @@
 
 <div id="stage"><canvas id="cv"></canvas></div>
 
-<div id="count" class="hide"><b id="num">0</b><span>本</span></div>
+<div id="count" class="hide"><b id="num">0</b><span>本</span><button id="calcBtn" aria-label="電卓を開く">🧮</button></div>
 <div id="ver"></div>
 
 <div id="empty">
@@ -200,6 +224,33 @@
   </div>
 </div>
 
+<div id="calcPanel" class="hide">
+  <div class="grab" aria-label="つまんで下げると閉じます"></div>
+  <div id="calcExpr">&nbsp;</div>
+  <div id="calcDisp">0</div>
+  <div id="calcKeys">
+    <button class="ck fn" data-k="C">C</button>
+    <button class="ck fn" data-k="back">⌫</button>
+    <button class="ck fn" data-k="/">÷</button>
+    <button class="ck op" data-k="*">×</button>
+    <button class="ck" data-k="7">7</button>
+    <button class="ck" data-k="8">8</button>
+    <button class="ck" data-k="9">9</button>
+    <button class="ck op" data-k="-">−</button>
+    <button class="ck" data-k="4">4</button>
+    <button class="ck" data-k="5">5</button>
+    <button class="ck" data-k="6">6</button>
+    <button class="ck op" data-k="+">＋</button>
+    <button class="ck" data-k="1">1</button>
+    <button class="ck" data-k="2">2</button>
+    <button class="ck" data-k="3">3</button>
+    <button class="ck eq" data-k="=">＝</button>
+    <button class="ck wide" data-k="0">0</button>
+    <button class="ck" data-k=".">.</button>
+  </div>
+  <button id="calcUseCount" class="sub">いまの本数を入れる</button>
+</div>
+
 <div id="eraseBanner" class="hide">消すモード：消したい印をタップ</div>
 <div id="roiBanner" class="hide">
   <div id="roiMsg">写真の上を指でタップして、範囲の角を順番に囲んでください</div>
@@ -216,7 +267,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v21';
+const APP_VER='v22';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -509,10 +560,13 @@ document.getElementById('clear').onclick=()=>{
 
 /* ---- 見た目（色・大きさ・番号） ---- */
 const lookBtn=document.getElementById('look');
+function closeLook(){ panel.classList.add('hide'); lookBtn.classList.remove('on'); }
+/* パネルは同じ場所に出るので、1枚だけ開くようにする */
+function closePanels(){ closeAuto(); closeSave(); closeCalc(); closeLook(); }
 lookBtn.onclick=()=>{
-  const open=panel.classList.toggle('hide')===false;
-  lookBtn.classList.toggle('on',open);
-  if(open) placePanels();
+  if(!panel.classList.contains('hide')){ closeLook(); return; }
+  closePanels();
+  panel.classList.remove('hide'); lookBtn.classList.add('on'); placePanels();
 };
 const swWrap=document.getElementById('swatches');
 COLORS.forEach(c=>{
@@ -848,6 +902,7 @@ const SENS=4;   // 感度は固定（利用者に選ばせない）
 function placePanels(){
   const b=bar.offsetHeight+8;
   autoPanel.style.bottom=b+'px'; panel.style.bottom=b+'px'; hint.style.bottom=(b+6)+'px';
+  calcPanel.style.bottom=b+'px';
 }
 guess.addEventListener('input',()=>{ guessVal.textContent=guess.value+'本'; });
 
@@ -968,6 +1023,7 @@ function closeAuto(){
 /* 「見た目」と同じで、もう一度押せば閉じる */
 autoBtn.onclick=()=>{
   if(!autoPanel.classList.contains('hide')){ closeAuto(); return; }
+  closePanels();
   autoBtn.classList.add('on');
   openAuto();
 };
@@ -1032,6 +1088,7 @@ function closeSave(){ savePanel.classList.add('hide'); saveBtn.classList.remove(
 saveBtn.onclick=()=>{
   if(!img) return;
   if(!savePanel.classList.contains('hide')){ closeSave(); return; }
+  closePanels();
   document.getElementById('saveMsg').innerHTML=
     `現在 <b style="color:var(--paint)">${marks.length}本</b>。画像は印つきのPNG、学習データは写真とタップ位置をまとめたファイルです。`;
   savePanel.classList.remove('hide'); saveBtn.classList.add('on'); placePanels();
@@ -1142,6 +1199,83 @@ if(location.search.includes('reset')){
   });
 }
 
+/* ================= 電卓 =================
+   荷台を何回かに分けて数えた時に、その場で足せるようにするためのもの。
+   開くと今の本数が入った状態で始まる。 */
+const calcPanel=document.getElementById('calcPanel');
+const calcBtn=document.getElementById('calcBtn');
+const calcDisp=document.getElementById('calcDisp');
+const calcExpr=document.getElementById('calcExpr');
+
+let cAcc=null;      // ここまでの計算結果
+let cOp=null;       // 待っている記号（＋−×÷）
+let cCur='0';       // いま打ち込んでいる数
+let cFresh=true;    // 次に数字を押したら打ち直すか
+
+const OP_SIGN={'+':'＋','-':'−','*':'×','/':'÷'};
+
+function calcShow(){
+  calcDisp.textContent=cCur;
+  calcExpr.innerHTML = cOp ? `${trim(cAcc)} ${OP_SIGN[cOp]}` : '&nbsp;';
+}
+/* 小数の誤差で 0.30000000000000004 のような表示にならないようにする */
+function trim(n){
+  if(!isFinite(n)) return 'エラー';
+  return String(Math.round(n*1e9)/1e9);
+}
+function apply(a,op,b){
+  switch(op){
+    case '+': return a+b;
+    case '-': return a-b;
+    case '*': return a*b;
+    case '/': return b===0 ? NaN : a/b;
+  }
+  return b;
+}
+function calcKey(k){
+  if(k==='C'){ cAcc=null; cOp=null; cCur='0'; cFresh=true; }
+  else if(k==='back'){
+    if(cFresh){ cCur='0'; }
+    else { cCur=cCur.slice(0,-1); if(cCur===''||cCur==='-') cCur='0'; }
+  }
+  else if(k==='.'){
+    if(cFresh){ cCur='0.'; cFresh=false; }
+    else if(!cCur.includes('.')) cCur+='.';
+  }
+  else if('0123456789'.includes(k)){
+    if(cFresh){ cCur=k; cFresh=false; }
+    else cCur = cCur==='0' ? k : cCur+k;
+  }
+  else if(k==='='){
+    if(cOp!==null){ cCur=trim(apply(cAcc,cOp,+cCur)); cAcc=null; cOp=null; }
+    cFresh=true;
+  }
+  else{  // ＋−×÷
+    if(cOp!==null && !cFresh) cCur=trim(apply(cAcc,cOp,+cCur));
+    cAcc=+cCur; cOp=k; cFresh=true;
+  }
+  calcShow();
+}
+document.getElementById('calcKeys').addEventListener('click', e=>{
+  const b=e.target.closest('.ck');
+  if(b) { calcKey(b.dataset.k); vib(8); }
+});
+document.getElementById('calcUseCount').onclick=()=>{
+  cCur=String(marks.length); cFresh=false; calcShow();
+};
+
+function closeCalc(){ calcPanel.classList.add('hide'); calcBtn.classList.remove('on'); }
+calcBtn.onclick=()=>{
+  if(!calcPanel.classList.contains('hide')){ closeCalc(); return; }
+  closePanels();
+  // 開いた時は今の本数から始める
+  cAcc=null; cOp=null; cCur=String(marks.length); cFresh=false;
+  calcShow();
+  calcPanel.classList.remove('hide');
+  calcBtn.classList.add('on');
+  placePanels();
+};
+
 /* ================= パネル上部の摘み =================
    タップするか、下へ引き下げると閉じる。
    どのパネルも閉じ方は同じにしてある。 */
@@ -1179,7 +1313,8 @@ function bindGrab(panelEl, closeFn){
 
 bindGrab(autoPanel, closeAuto);
 bindGrab(savePanel, closeSave);
-bindGrab(panel, ()=>{ panel.classList.add('hide'); lookBtn.classList.remove('on'); });
+bindGrab(panel, closeLook);
+bindGrab(calcPanel, closeCalc);
 
 resize();
 </script>
