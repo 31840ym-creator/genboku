@@ -16,6 +16,7 @@
     --sawn-dim:#A2937B;
     --paint:#FF5A1F;
     --paint-ink:#1E1610;
+    --calc-op:#FFD400;      /* 電卓の＋−×÷と＝ */
     --line:#463527;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -104,8 +105,11 @@
   #calcHistBtn{flex:none;background:var(--bark-2);color:var(--sawn-dim);
     border:1px solid var(--line);border-radius:9px;padding:6px 12px;font-size:12px;font-weight:600;}
   #calcHistBtn.on{color:var(--paint);border-color:var(--paint);}
-  #calcExpr{flex:1;text-align:right;font-size:12px;color:var(--sawn-dim);min-height:18px;
-    font-variant-numeric:tabular-nums;overflow:hidden;white-space:nowrap;}
+  #calcExpr{flex:1;text-align:right;font-size:20px;font-weight:700;color:var(--sawn);
+    min-height:28px;letter-spacing:-.01em;
+    font-variant-numeric:tabular-nums;white-space:nowrap;
+    overflow-x:auto;scrollbar-width:none;}
+  #calcExpr::-webkit-scrollbar{display:none;}
   /* 履歴。押すと数字を打ち直さずに続きから計算できる */
   #calcHist{max-height:246px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;}
   #calcHist .hrow{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
@@ -116,17 +120,18 @@
   #calcHist .empty{color:var(--sawn-dim);font-size:12px;text-align:center;padding:26px 0;}
   #calcHist .clear{background:none;border:1px dashed var(--line);color:var(--sawn-dim);
     border-radius:10px;padding:9px 4px;font-size:11.5px;}
-  #calcDisp{text-align:right;font-size:34px;font-weight:800;color:var(--sawn);
-    letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-bottom:12px;
-    overflow:hidden;white-space:nowrap;}
+  #calcDisp{text-align:right;font-size:15px;font-weight:600;color:var(--sawn-dim);
+    letter-spacing:0;font-variant-numeric:tabular-nums;margin:2px 0 12px;
+    min-height:24px;overflow:hidden;white-space:nowrap;}
+  #calcDisp.answer{font-size:34px;font-weight:800;color:var(--sawn);letter-spacing:-.02em;}
   #calcKeys{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;}
   .ck{background:var(--bark-2);color:var(--sawn);border:1px solid var(--line);
     border-radius:11px;padding:13px 2px;font-size:19px;font-weight:600;
     font-variant-numeric:tabular-nums;}
   .ck:active{background:#3A2C1F;}
-  .ck.op{color:var(--paint);}
+  .ck.op{color:var(--calc-op);border-color:#6A5320;}
   .ck.fn{color:var(--sawn-dim);font-size:16px;}
-  .ck.eq{background:var(--paint);color:var(--paint-ink);border-color:var(--paint);
+  .ck.eq{background:var(--calc-op);color:#2A2206;border-color:var(--calc-op);
     grid-row:span 2;}
   .ck.wide{grid-column:span 2;}
 
@@ -265,7 +270,7 @@
   <div id="calcKeys">
     <button class="ck fn" data-k="C">C</button>
     <button class="ck fn" data-k="back">⌫</button>
-    <button class="ck fn" data-k="/">÷</button>
+    <button class="ck op" data-k="/">÷</button>
     <button class="ck op" data-k="*">×</button>
     <button class="ck" data-k="7">7</button>
     <button class="ck" data-k="8">8</button>
@@ -300,7 +305,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v23';
+const APP_VER='v24';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -1244,12 +1249,25 @@ let cAcc=null;      // ここまでの計算結果
 let cOp=null;       // 待っている記号（＋−×÷）
 let cCur='0';       // いま打ち込んでいる数
 let cFresh=true;    // 次に数字を押したら打ち直すか
+let cChain='';      // 上に出す式（例「48 ＋ 52 ＋ 」）
+let cAnswer=true;   // ＝を押して答えを出している最中か
 
 const OP_SIGN={'+':'＋','-':'−','*':'×','/':'÷'};
 
+/* ＝を押すまでは、上に式・下に途中計算を小さく出す。
+   ＝を押したら、その答えを大きく出す。 */
 function calcShow(){
-  calcDisp.textContent=cCur;
-  calcExpr.innerHTML = cOp ? `${trim(cAcc)} ${OP_SIGN[cOp]}` : '&nbsp;';
+  if(cAnswer){
+    calcExpr.innerHTML = cChain || '&nbsp;';
+    calcDisp.textContent = cCur;
+    calcDisp.classList.add('answer');
+  }else{
+    // 記号を押した直後（次の数を待っている間）は式に同じ数を重ねない
+    calcExpr.textContent = cChain + (cFresh ? '' : cCur);
+    calcDisp.textContent = (cOp!==null && !cFresh) ? trim(apply(cAcc,cOp,+cCur)) : cCur;
+    calcDisp.classList.remove('answer');
+  }
+  calcExpr.scrollLeft = calcExpr.scrollWidth;   // 長い式は右端（打った所）を見せる
 }
 /* 小数の誤差で 0.30000000000000004 のような表示にならないようにする */
 function trim(n){
@@ -1266,30 +1284,41 @@ function apply(a,op,b){
   return b;
 }
 function calcKey(k){
-  if(k==='C'){ cAcc=null; cOp=null; cCur='0'; cFresh=true; }
+  if(k==='C'){ cAcc=null; cOp=null; cCur='0'; cFresh=true; cChain=''; cAnswer=true; }
   else if(k==='back'){
-    if(cFresh){ cCur='0'; }
+    if(cAnswer||cFresh){ cCur='0'; cFresh=false; cAnswer=false; }
     else { cCur=cCur.slice(0,-1); if(cCur===''||cCur==='-') cCur='0'; }
   }
   else if(k==='.'){
-    if(cFresh){ cCur='0.'; cFresh=false; }
+    if(cAnswer){ cChain=''; cCur='0.'; cFresh=false; cAnswer=false; }
+    else if(cFresh){ cCur='0.'; cFresh=false; }
     else if(!cCur.includes('.')) cCur+='.';
   }
   else if('0123456789'.includes(k)){
-    if(cFresh){ cCur=k; cFresh=false; }
+    if(cAnswer){ cChain=''; cCur=k; cFresh=false; cAnswer=false; }   // 答えの後に打つと新しい計算
+    else if(cFresh){ cCur=k; cFresh=false; }
     else cCur = cCur==='0' ? k : cCur+k;
   }
   else if(k==='='){
     if(cOp!==null){
-      const expr=`${trim(cAcc)} ${OP_SIGN[cOp]} ${cCur}`;
+      const expr=cChain + cCur;
       cCur=trim(apply(cAcc,cOp,+cCur)); cAcc=null; cOp=null;
+      cChain=expr;                      // 上には計算した式を残す
       pushHist(expr, cCur);
     }
-    cFresh=true;
+    cFresh=true; cAnswer=true;
   }
   else{  // ＋−×÷
-    if(cOp!==null && !cFresh) cCur=trim(apply(cAcc,cOp,+cCur));
-    cAcc=+cCur; cOp=k; cFresh=true;
+    if(cAnswer) cChain='';              // 答えから続けて計算する場合
+    if(cFresh && cChain){
+      // 記号を押し直した時は、前の記号を置き換えるだけ
+      cChain = cChain.replace(/[＋−×÷] $/, OP_SIGN[k]+' ');
+    }else{
+      const typed=cCur;                 // 式に積むのは「打った数」
+      if(cOp!==null && !cFresh) cCur=trim(apply(cAcc,cOp,+cCur));
+      cChain += typed + ' ' + OP_SIGN[k] + ' ';
+    }
+    cAcc=+cCur; cOp=k; cFresh=true; cAnswer=false;
   }
   calcShow();
 }
@@ -1326,7 +1355,7 @@ function drawHist(){
     const b=document.createElement('button');
     b.className='hrow';
     b.innerHTML=`<span class="he">${h.e} ＝</span><span class="hr">${h.r}</span>`;
-    b.onclick=()=>{ cCur=h.r; cAcc=null; cOp=null; cFresh=false; calcShow(); showKeys(); };
+    b.onclick=()=>{ cCur=h.r; cAcc=null; cOp=null; cFresh=true; cChain=''; cAnswer=true; calcShow(); showKeys(); };
     histBox.appendChild(b);
   });
   const c=document.createElement('button');
