@@ -162,6 +162,9 @@
   #hint span{display:inline-block;background:rgba(30,22,16,.94);border:1px solid var(--line);
     border-radius:999px;padding:7px 15px;line-height:1.5;max-width:100%;
     backdrop-filter:blur(6px);}
+  #hint span.multi{border-radius:14px;padding:9px 16px 10px;}
+  #hint i{display:block;font-style:normal;margin-top:6px;padding-top:6px;
+    border-top:1px solid var(--line);color:#E8A96B;font-size:11px;line-height:1.55;}
   #busy{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
     background:rgba(30,22,16,.7);font-size:14px;color:var(--sawn-dim);}
   input[type=file]{display:none;}
@@ -308,7 +311,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v25';
+const APP_VER='v26';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -1010,8 +1013,10 @@ function searchDetect(n){
 
 /* 画面下に少しの間だけ出る知らせ。写真の邪魔をしないよう自動で消える */
 let flashTimer=null;
-function flash(msg, ms=5000){
-  hint.innerHTML='<span>'+msg+'</span>';
+function flash(msg, ms=5000, caution){
+  hint.innerHTML = caution
+    ? '<span class="multi">'+msg+'<i>'+caution+'</i></span>'
+    : '<span>'+msg+'</span>';
   hint.classList.remove('hide');
   hint.style.opacity=1;
   placePanels();                       // 下のバーの高さに合わせて位置を決める
@@ -1046,7 +1051,9 @@ async function runAuto(){
     // 数え終わったら写真を確かめたいので、パネルは畳んで写真を見せる
     closeAuto();
     flash(`<b style="color:var(--paint)">${marks.length}本</b> 検出（${((performance.now()-t0)/1000).toFixed(1)}秒）`+
-      `　抜けはタップで追加、余分は「消す」で削除`);
+      `　抜けはタップで追加、余分は「消す」で削除`,
+      10000,
+      'AIが数えた目安です。荷渡しの前に、必ずご自身の目で確かめてください');
     beep('ten');
   }catch(err){
     console.error(err);
