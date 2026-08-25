@@ -99,40 +99,43 @@
     padding:14px 16px 16px;backdrop-filter:blur(8px);}
   /* 電卓。荷台ごとの本数を足したい時などに使う */
   #calcPanel{position:fixed;left:8px;right:8px;bottom:150px;
-    background:rgba(38,30,22,.97);border:1px solid var(--line);border-radius:16px;
-    padding:14px 16px 16px;backdrop-filter:blur(8px);max-width:420px;margin:0 auto;}
+    background:#000;border:1px solid #333;border-radius:16px;
+    padding:12px 14px 14px;max-width:420px;margin:0 auto;}
+  #calcPanel .grab::before{background:#3A3A3A;}
+  #calcPanel .grab.hot::before{background:var(--calc-op);}
   #calcTop{display:flex;align-items:center;gap:10px;}
-  #calcHistBtn{flex:none;background:var(--bark-2);color:var(--sawn-dim);
-    border:1px solid var(--line);border-radius:9px;padding:6px 12px;font-size:12px;font-weight:600;}
-  #calcHistBtn.on{color:var(--paint);border-color:var(--paint);}
-  #calcExpr{flex:1;text-align:right;font-size:20px;font-weight:700;color:var(--sawn);
-    min-height:28px;letter-spacing:-.01em;
+  #calcHistBtn{flex:none;background:#161616;color:#9A9A9A;
+    border:1px solid #333;border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;}
+  #calcHistBtn.on{color:var(--calc-op);border-color:var(--calc-op);}
+  #calcExpr{flex:1;text-align:right;font-size:26px;font-weight:700;color:#FFF;
+    min-height:36px;letter-spacing:-.01em;
     font-variant-numeric:tabular-nums;white-space:nowrap;
     overflow-x:auto;scrollbar-width:none;}
   #calcExpr::-webkit-scrollbar{display:none;}
   /* 履歴。押すと数字を打ち直さずに続きから計算できる */
   #calcHist{max-height:246px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;}
   #calcHist .hrow{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
-    background:var(--bark-2);border:1px solid var(--line);border-radius:10px;
-    padding:10px 12px;font-variant-numeric:tabular-nums;width:100%;text-align:left;}
-  #calcHist .hrow .he{font-size:12px;color:var(--sawn-dim);overflow:hidden;white-space:nowrap;}
-  #calcHist .hrow .hr{font-size:17px;font-weight:700;color:var(--sawn);flex:none;}
-  #calcHist .empty{color:var(--sawn-dim);font-size:12px;text-align:center;padding:26px 0;}
-  #calcHist .clear{background:none;border:1px dashed var(--line);color:var(--sawn-dim);
-    border-radius:10px;padding:9px 4px;font-size:11.5px;}
-  #calcDisp{text-align:right;font-size:15px;font-weight:600;color:var(--sawn-dim);
+    background:#1C1C1C;border:1px solid #333;border-radius:10px;
+    padding:12px 13px;font-variant-numeric:tabular-nums;width:100%;text-align:left;}
+  #calcHist .hrow .he{font-size:14px;color:#9A9A9A;overflow:hidden;white-space:nowrap;}
+  #calcHist .hrow .hr{font-size:20px;font-weight:700;color:#FFF;flex:none;}
+  #calcHist .empty{color:#8C8C8C;font-size:14px;text-align:center;padding:26px 0;}
+  #calcHist .clear{background:none;border:1px dashed #444;color:#9A9A9A;
+    border-radius:10px;padding:11px 4px;font-size:13px;}
+  #calcDisp{text-align:right;font-size:20px;font-weight:600;color:#8C8C8C;
     letter-spacing:0;font-variant-numeric:tabular-nums;margin:2px 0 12px;
-    min-height:24px;overflow:hidden;white-space:nowrap;}
-  #calcDisp.answer{font-size:34px;font-weight:800;color:var(--sawn);letter-spacing:-.02em;}
+    min-height:30px;overflow:hidden;white-space:nowrap;}
+  #calcDisp.answer{font-size:46px;font-weight:800;color:#FFF;letter-spacing:-.02em;
+    line-height:1.05;}
   #calcKeys{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;}
-  .ck{background:var(--bark-2);color:var(--sawn);border:1px solid var(--line);
-    border-radius:11px;padding:13px 2px;font-size:19px;font-weight:600;
+  .ck{background:#1C1C1C;color:#FFF;border:1px solid #333;
+    border-radius:12px;padding:16px 2px;font-size:25px;font-weight:600;
     font-variant-numeric:tabular-nums;}
-  .ck:active{background:#3A2C1F;}
-  .ck.op{color:var(--calc-op);border-color:#6A5320;}
-  .ck.fn{color:var(--sawn-dim);font-size:16px;}
-  .ck.eq{background:var(--calc-op);color:#2A2206;border-color:var(--calc-op);
-    grid-row:span 2;}
+  .ck:active{background:#333;}
+  .ck.op{color:var(--calc-op);border-color:#6A5320;font-size:27px;}
+  .ck.fn{color:#9A9A9A;font-size:21px;}
+  .ck.eq{background:var(--calc-op);color:#241D04;border-color:var(--calc-op);
+    grid-row:span 2;font-size:27px;}
   .ck.wide{grid-column:span 2;}
 
   /* パネル上部の摘み。タップするか、下へ引き下げると閉じる */
@@ -305,7 +308,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v24';
+const APP_VER='v25';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -1245,30 +1248,17 @@ const calcBtn=document.getElementById('calcBtn');
 const calcDisp=document.getElementById('calcDisp');
 const calcExpr=document.getElementById('calcExpr');
 
-let cAcc=null;      // ここまでの計算結果
-let cOp=null;       // 待っている記号（＋−×÷）
-let cCur='0';       // いま打ち込んでいる数
-let cFresh=true;    // 次に数字を押したら打ち直すか
-let cChain='';      // 上に出す式（例「48 ＋ 52 ＋ 」）
-let cAnswer=true;   // ＝を押して答えを出している最中か
+/* 式は「数と記号の並び」で持つ。文字列で持つと⌫で記号を消せないため。
+   例： ['48', '+', '52']  */
+let toks=[];        // 打ち込んだ並び
+let editing=false;  // 並びの最後の数をいま打っている最中か
+let cAnswer=true;   // ＝の答えを出している最中か
+let ansExpr='';     // ＝を押した時の式
+let ansVal='0';     // ＝の答え
 
 const OP_SIGN={'+':'＋','-':'−','*':'×','/':'÷'};
+const isOp = t => t.length===1 && '+-*/'.includes(t);
 
-/* ＝を押すまでは、上に式・下に途中計算を小さく出す。
-   ＝を押したら、その答えを大きく出す。 */
-function calcShow(){
-  if(cAnswer){
-    calcExpr.innerHTML = cChain || '&nbsp;';
-    calcDisp.textContent = cCur;
-    calcDisp.classList.add('answer');
-  }else{
-    // 記号を押した直後（次の数を待っている間）は式に同じ数を重ねない
-    calcExpr.textContent = cChain + (cFresh ? '' : cCur);
-    calcDisp.textContent = (cOp!==null && !cFresh) ? trim(apply(cAcc,cOp,+cCur)) : cCur;
-    calcDisp.classList.remove('answer');
-  }
-  calcExpr.scrollLeft = calcExpr.scrollWidth;   // 長い式は右端（打った所）を見せる
-}
 /* 小数の誤差で 0.30000000000000004 のような表示にならないようにする */
 function trim(n){
   if(!isFinite(n)) return 'エラー';
@@ -1283,42 +1273,84 @@ function apply(a,op,b){
   }
   return b;
 }
+/* 並びを左から順に計算する（電卓と同じで、掛け算を先にはしない）。
+   末尾の記号は、まだ数が来ていないので無視する。 */
+function evalToks(){
+  const a=toks.slice();
+  if(a.length && isOp(a[a.length-1])) a.pop();
+  if(!a.length) return null;
+  let acc=+a[0];
+  for(let i=1;i+1<a.length;i+=2) acc=apply(acc, a[i], +a[i+1]);
+  return acc;
+}
+function exprText(){
+  return toks.map(t => isOp(t) ? OP_SIGN[t] : t).join(' ');
+}
+
+/* ＝を押すまでは、上に式・下に途中計算を小さく出す。
+   ＝を押したら、その答えを大きく出す。 */
+function calcShow(){
+  if(cAnswer){
+    calcExpr.innerHTML = ansExpr || '&nbsp;';
+    calcDisp.textContent = ansVal;
+    calcDisp.classList.add('answer');
+  }else{
+    calcExpr.innerHTML = exprText() || '&nbsp;';
+    const v=evalToks();
+    calcDisp.textContent = v===null ? '0' : trim(v);
+    calcDisp.classList.remove('answer');
+  }
+  calcExpr.scrollLeft = calcExpr.scrollWidth;   // 長い式は右端（打った所）を見せる
+}
+
 function calcKey(k){
-  if(k==='C'){ cAcc=null; cOp=null; cCur='0'; cFresh=true; cChain=''; cAnswer=true; }
+  const last = () => toks[toks.length-1];
+
+  if(k==='C'){ toks=[]; editing=false; cAnswer=true; ansExpr=''; ansVal='0'; }
+
   else if(k==='back'){
-    if(cAnswer||cFresh){ cCur='0'; cFresh=false; cAnswer=false; }
-    else { cCur=cCur.slice(0,-1); if(cCur===''||cCur==='-') cCur='0'; }
+    // 答えを出した後は、その答えを打ち直す形にしてから消す
+    if(cAnswer){ toks=[ansVal]; editing=true; cAnswer=false; }
+    if(toks.length){
+      const t=last();
+      if(!isOp(t) && t.length>1 && !(t.length===2 && t.startsWith('-'))){
+        toks[toks.length-1]=t.slice(0,-1);
+        editing=true;
+      }else{
+        toks.pop();                       // 記号も1つとして消える
+        editing = toks.length>0 && !isOp(last());
+      }
+    }
   }
+
   else if(k==='.'){
-    if(cAnswer){ cChain=''; cCur='0.'; cFresh=false; cAnswer=false; }
-    else if(cFresh){ cCur='0.'; cFresh=false; }
-    else if(!cCur.includes('.')) cCur+='.';
+    if(cAnswer){ toks=['0.']; editing=true; cAnswer=false; }
+    else if(editing){ if(!last().includes('.')) toks[toks.length-1]+='.'; }
+    else { toks.push('0.'); editing=true; }
   }
+
   else if('0123456789'.includes(k)){
-    if(cAnswer){ cChain=''; cCur=k; cFresh=false; cAnswer=false; }   // 答えの後に打つと新しい計算
-    else if(cFresh){ cCur=k; cFresh=false; }
-    else cCur = cCur==='0' ? k : cCur+k;
+    if(cAnswer){ toks=[k]; editing=true; cAnswer=false; }   // 答えの後に打つと新しい計算
+    else if(editing){ toks[toks.length-1] = last()==='0' ? k : last()+k; }
+    else { toks.push(k); editing=true; }
   }
+
   else if(k==='='){
-    if(cOp!==null){
-      const expr=cChain + cCur;
-      cCur=trim(apply(cAcc,cOp,+cCur)); cAcc=null; cOp=null;
-      cChain=expr;                      // 上には計算した式を残す
-      pushHist(expr, cCur);
+    const v=evalToks();
+    if(v!==null && toks.length>1){
+      ansExpr=exprText().replace(/ [＋−×÷]$/,'');   // 末尾の記号は式から落とす
+      ansVal=trim(v);
+      pushHist(ansExpr, ansVal);
+      toks=[ansVal]; editing=false; cAnswer=true;
     }
-    cFresh=true; cAnswer=true;
   }
+
   else{  // ＋−×÷
-    if(cAnswer) cChain='';              // 答えから続けて計算する場合
-    if(cFresh && cChain){
-      // 記号を押し直した時は、前の記号を置き換えるだけ
-      cChain = cChain.replace(/[＋−×÷] $/, OP_SIGN[k]+' ');
-    }else{
-      const typed=cCur;                 // 式に積むのは「打った数」
-      if(cOp!==null && !cFresh) cCur=trim(apply(cAcc,cOp,+cCur));
-      cChain += typed + ' ' + OP_SIGN[k] + ' ';
-    }
-    cAcc=+cCur; cOp=k; cFresh=true; cAnswer=false;
+    if(cAnswer){ toks=[ansVal]; cAnswer=false; }
+    if(!toks.length) toks.push('0');
+    if(isOp(last())) toks[toks.length-1]=k;   // 記号の押し直しは差し替え
+    else toks.push(k);
+    editing=false;
   }
   calcShow();
 }
@@ -1355,7 +1387,7 @@ function drawHist(){
     const b=document.createElement('button');
     b.className='hrow';
     b.innerHTML=`<span class="he">${h.e} ＝</span><span class="hr">${h.r}</span>`;
-    b.onclick=()=>{ cCur=h.r; cAcc=null; cOp=null; cFresh=true; cChain=''; cAnswer=true; calcShow(); showKeys(); };
+    b.onclick=()=>{ toks=[h.r]; editing=false; cAnswer=true; ansExpr=h.e; ansVal=h.r; calcShow(); showKeys(); };
     histBox.appendChild(b);
   });
   const c=document.createElement('button');
