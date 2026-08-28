@@ -45,8 +45,26 @@
   #camBtn{color:var(--paint);}
   body.erasing #count{top:calc(38px + env(safe-area-inset-top));}
   #ver{font-size:11px;color:var(--sawn-dim);background:rgba(30,22,16,.8);
-    border:1px solid var(--line);border-radius:8px;padding:3px 8px;letter-spacing:.05em;
-    backdrop-filter:blur(6px);white-space:nowrap;}
+    border:1px solid var(--line);border-radius:8px;padding:6px 9px;letter-spacing:.05em;
+    backdrop-filter:blur(6px);white-space:nowrap;font-family:inherit;}
+  #ver.on{border-color:var(--paint);}
+
+  /* 設定。版バッジを押すと開く */
+  #setPanel{position:fixed;left:8px;right:8px;bottom:150px;
+    background:rgba(38,30,22,.97);border:1px solid var(--line);border-radius:16px;
+    padding:14px 16px 16px;backdrop-filter:blur(8px);overflow-y:auto;}
+  .setHead{font-size:13px;font-weight:700;color:var(--sawn);margin-bottom:10px;letter-spacing:.06em;}
+  .setRow{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+    padding:9px 0;border-top:1px solid var(--line);font-size:12.5px;color:var(--sawn-dim);}
+  .setRow b{color:var(--sawn);font-weight:600;text-align:right;
+    font-variant-numeric:tabular-nums;}
+  .setLink{display:flex;justify-content:space-between;align-items:center;
+    padding:12px 0;border-top:1px solid var(--line);font-size:13px;
+    color:var(--sawn);text-decoration:none;}
+  .setLink::after{content:'›';color:var(--sawn-dim);font-size:17px;}
+  .setLink.soon{color:var(--sawn-dim);pointer-events:none;}
+  .setLink.soon::after{content:'準備中';font-size:11px;}
+  #setReset{margin-top:14px;width:100%;}
 
   #empty{position:fixed;inset:0;display:flex;flex-direction:column;
     align-items:center;justify-content:center;gap:18px;padding:32px;text-align:center;}
@@ -204,7 +222,7 @@
       <circle cx="14.8" cy="16.4" r="1.15" fill="currentColor" stroke="none"/>
     </svg>
   </button>
-  <div id="ver"></div>
+  <button id="ver" aria-label="設定を開く"></button>
 </div>
 
 <div id="empty">
@@ -281,6 +299,16 @@
   </div>
 </div>
 
+<div id="setPanel" class="hide">
+  <div class="grab" aria-label="つまんで下げると閉じます"></div>
+  <div class="setHead">設定</div>
+  <div class="setRow"><span>アプリの版</span><b id="setVer">-</b></div>
+  <div class="setRow"><span>AI</span><b id="setAI">-</b></div>
+  <div class="setRow"><span>数え方</span><b id="setConf">-</b></div>
+  <div id="setLegal"></div>
+  <button id="setReset" class="sub">うまく動かない時：保存庫を作り直す</button>
+</div>
+
 <div id="calcPanel" class="hide">
   <div class="grab" aria-label="つまんで下げると閉じます"></div>
   <div id="calcTop">
@@ -327,7 +355,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v31';
+const APP_VER='v32';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -643,7 +671,7 @@ document.getElementById('clear').onclick=()=>{
 const lookBtn=document.getElementById('look');
 function closeLook(){ panel.classList.add('hide'); lookBtn.classList.remove('on'); }
 /* パネルは同じ場所に出るので、1枚だけ開くようにする */
-function closePanels(){ closeAuto(); closeSave(); closeCalc(); closeLook(); }
+function closePanels(){ closeAuto(); closeSave(); closeCalc(); closeLook(); closeSet(); }
 lookBtn.onclick=()=>{
   if(!panel.classList.contains('hide')){ closeLook(); return; }
   closePanels();
@@ -974,7 +1002,8 @@ function placePanels(){
     document.getElementById('topRight').getBoundingClientRect().bottom,
     countBox.getBoundingClientRect().bottom) + 8;
   const room=Math.max(220, window.innerHeight - b - topEnd);
-  for(const el of [calcPanel, autoPanel, savePanel, panel]) el.style.maxHeight=room+'px';
+  for(const el of [calcPanel, autoPanel, savePanel, panel, setPanel]) el.style.maxHeight=room+'px';
+  setPanel.style.bottom=b+'px';
 }
 guess.addEventListener('input',()=>{ guessVal.textContent=guess.value+'本'; });
 
@@ -1277,6 +1306,66 @@ if(location.search.includes('reset')){
   });
 }
 
+/* ================= 設定 =================
+   下のバーはもう8個で2段あるので、ボタンは増やさず
+   版バッジ(右上)を押すと開くようにしている。 */
+
+/* 規約・ポリシー・連絡先が用意できたら true にする。
+   false の間は「準備中」と出して、押せないようにしておく
+   (公開していないページへ飛ばさないため)。
+   pwa/privacy.html と pwa/terms.html の【　】を埋めて
+   deploy_pwa.sh が公開したら、ここを true にすること。 */
+const LEGAL_READY=false;
+const CONTACT_MAIL='';        // 例 'genboku@example.com'
+
+const setPanel=document.getElementById('setPanel');
+const verBtn=document.getElementById('ver');
+
+function closeSet(){ setPanel.classList.add('hide'); verBtn.classList.remove('on'); }
+
+function drawLegal(){
+  const box=document.getElementById('setLegal');
+  const rows=[
+    {href:'./terms.html',   label:'利用規約'},
+    {href:'./privacy.html', label:'プライバシーポリシー'},
+    {href:CONTACT_MAIL ? 'mailto:'+CONTACT_MAIL : '', label:'お問い合わせ'},
+  ];
+  box.innerHTML='';
+  for(const r of rows){
+    const a=document.createElement('a');
+    const ready = LEGAL_READY && r.href;
+    a.className='setLink'+(ready?'':' soon');
+    a.textContent=r.label;
+    if(ready){ a.href=r.href; a.target='_blank'; a.rel='noopener'; }
+    box.appendChild(a);
+  }
+}
+
+verBtn.onclick=()=>{
+  if(!setPanel.classList.contains('hide')){ closeSet(); return; }
+  closePanels();
+  document.getElementById('setVer').textContent=APP_VER;
+  document.getElementById('setAI').textContent =
+    aiReady ? '使えます' : (aiTried ? '使えません' : 'まだ読み込んでいません');
+  const cur=CONF_OPTS.find(o=>o.v===confValue);
+  document.getElementById('setConf').textContent = cur ? cur.label : '-';
+  drawLegal();
+  setPanel.classList.remove('hide');
+  verBtn.classList.add('on');
+  placePanels();
+};
+
+/* 「前の版のまま」「AIが読めない」時の逃げ道。
+   保存庫を空にして入れ直す。次に開く時だけ通信が要る。 */
+document.getElementById('setReset').onclick=async ()=>{
+  if(!confirm('保存庫を作り直しますか？\n\n次に開く時、AIの読み込みで通信が必要になります。\n写真や印は消えません。')) return;
+  try{
+    for(const k of await caches.keys()) await caches.delete(k);
+    for(const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+  }catch(e){ console.log('reset:',e); }
+  location.reload(true);
+};
+
 /* ================= 電卓 =================
    荷台を何回かに分けて数えた時に、その場で足せるようにするためのもの。
    開くと今の本数が入った状態で始まる。 */
@@ -1497,6 +1586,7 @@ bindGrab(autoPanel, closeAuto);
 bindGrab(savePanel, closeSave);
 bindGrab(panel, closeLook);
 bindGrab(calcPanel, closeCalc);
+bindGrab(setPanel, closeSet);
 
 resize();
 </script>
