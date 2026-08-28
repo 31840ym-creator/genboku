@@ -36,10 +36,12 @@
   /* 右上：電卓ボタンと版の表示を並べる */
   #topRight{position:fixed;top:calc(12px + env(safe-area-inset-top));right:12px;
     display:flex;align-items:center;gap:8px;}
-  #calcBtn{background:rgba(30,22,16,.8);border:1px solid var(--line);color:var(--sawn);
-    border-radius:9px;padding:5px 7px;line-height:0;backdrop-filter:blur(6px);}
-  #calcBtn svg{width:20px;height:20px;display:block;}
+  #calcBtn,#camBtn{background:rgba(30,22,16,.86);border:1px solid var(--line);
+    color:var(--sawn);border-radius:12px;padding:9px;line-height:0;backdrop-filter:blur(6px);}
+  #calcBtn svg,#camBtn svg{width:26px;height:26px;display:block;}
+  #calcBtn:active,#camBtn:active{background:#3A2C1F;}
   #calcBtn.on{border-color:var(--paint);color:var(--paint);background:#3A2C1F;}
+  #camBtn{color:var(--paint);}
   body.erasing #count{top:calc(38px + env(safe-area-inset-top));}
   #ver{font-size:11px;color:var(--sawn-dim);background:rgba(30,22,16,.8);
     border:1px solid var(--line);border-radius:8px;padding:3px 8px;letter-spacing:.05em;
@@ -182,6 +184,12 @@
 <div id="count" class="hide"><b id="num">0</b><span>本</span></div>
 
 <div id="topRight">
+  <button id="camBtn" aria-label="写真を撮って数える">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
+      <path d="M3 8.5h3.2l1.5-2.4h8.6l1.5 2.4H21v11H3z" stroke-linecap="round"/>
+      <circle cx="12" cy="14" r="3.9"/>
+    </svg>
+  </button>
   <button id="calcBtn" aria-label="電卓を開く">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
       <rect x="5" y="2.5" width="14" height="19" rx="2.5"/>
@@ -315,7 +323,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v27';
+const APP_VER='v28';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -574,22 +582,45 @@ async function load(file){
 }
 
 let loading=false;
+let countAfterLoad=false;   // カメラで撮った時は、読み込んだ流れでそのまま数える
 fileInput.addEventListener('change',async e=>{
   const f=e.target.files&&e.target.files[0];
   if(!f||loading) return;
   loading=true;
   try{
     await load(f);
+    if(countAfterLoad){
+      countAfterLoad=false;
+      busy.textContent='AIを準備しています…';
+      busy.classList.remove('hide');
+      const ok=await loadAI();
+      busy.classList.add('hide');
+      if(ok) await runAuto();
+      else openAuto();      // AIが使えない時は、本数を決めてもらう画面を出す
+    }
   }catch(err){
     console.error(err);
     alert('この写真は読み込めませんでした。\n形式がHEICなどの場合はJPEGで撮り直すか、ギャラリーで一度編集・保存してから選んでください。');
   }finally{
     loading=false;
+    countAfterLoad=false;
+    busy.classList.add('hide'); busy.textContent='写真を読み込み中…';
     fileInput.value='';   // 読み込み完了後にクリア（同じ写真も再選択できる）
   }
 });
-document.getElementById('pick').onclick=()=>fileInput.click();
-document.getElementById('pickBig').onclick=()=>fileInput.click();
+function pickPhoto(){
+  countAfterLoad=false;
+  fileInput.removeAttribute('capture');   // ギャラリーから選ぶ
+  fileInput.click();
+}
+document.getElementById('pick').onclick=pickPhoto;
+document.getElementById('pickBig').onclick=pickPhoto;
+/* カメラ。撮った写真をそのまま数えるところまで一気に進む */
+document.getElementById('camBtn').onclick=()=>{
+  countAfterLoad=true;
+  fileInput.setAttribute('capture','environment');   // 外側のカメラを開く
+  fileInput.click();
+};
 
 document.getElementById('undo').onclick=()=>{ marks.pop(); updateCount(); draw(); };
 const eraseBtn=document.getElementById('erase'), eraseBanner=document.getElementById('eraseBanner');
@@ -806,6 +837,7 @@ const AI_LIBS=[
   {way:'mjs', base:'https://unpkg.com/onnxruntime-web@1.20.1/dist/',            file:'ort.min.mjs'},
 ];
 let ort=null, session=null, aiReady=false, aiTried=false, aiError='';
+let aiJob=null;   // 読み込み中の処理。2回目以降の呼び出しは、これが終わるのを待つ
 
 function loadTag(url){
   return new Promise((res,rej)=>{
@@ -818,8 +850,12 @@ function loadTag(url){
   });
 }
 
-async function loadAI(){
-  if(aiTried) return aiReady;
+function loadAI(){
+  if(aiJob) return aiJob;      // すでに始まっていれば、その結果を待つ
+  aiJob = loadAIOnce();
+  return aiJob;
+}
+async function loadAIOnce(){
   aiTried=true;
   aiError='';
   const logs=[];
@@ -987,7 +1023,8 @@ CONF_OPTS.forEach(o=>{
 async function openAuto(){
   if(!img) return;
   autoPanel.classList.remove('hide'); placePanels(); draw();
-  if(!aiTried){
+  if(!aiReady){
+    // 写真を読み込んだ時に始まっている場合があるので、終わるまで待ってから出し分ける
     autoMsg.textContent='AIモデルを準備しています…（初回のみ時間がかかります）';
     await loadAI();
   }
