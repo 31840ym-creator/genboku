@@ -4,7 +4,7 @@
    ・外部サイト(AIライブラリのCDNなど)には一切手を出さない。
      横取りすると読み込みに失敗することがあるため、ブラウザに任せる。
    ・失敗した応答は保存しない。 */
-const CACHE = 'genboku-v30';
+const CACHE = 'genboku-v31';
 const FILES = ['./', './index.html', './manifest.json', './icon.png'];
 
 self.addEventListener('install', e => {
@@ -44,8 +44,9 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  /* モデルは重いので保存庫に入れる（成功した時だけ） */
-  if (url.pathname.endsWith('.onnx')) {
+  /* モデルとAIライブラリは重いので保存庫に入れる（成功した時だけ）。
+     一度使えば、次からは圏外でも動く。 */
+  if (url.pathname.endsWith('.onnx') || url.pathname.includes('/ort/')) {
     e.respondWith(
       caches.match(e.request).then(hit => hit || fetch(e.request).then(res => {
         if (res && res.ok) {

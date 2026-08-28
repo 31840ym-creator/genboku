@@ -327,7 +327,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v30';
+const APP_VER='v31';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -828,29 +828,19 @@ function detect(sensV, R){
 const MODEL_FILE='./genboku_yolox_int8.onnx';  // 差し替える時はここだけ変える
 const AI_SIZE=960;                 // 学習時と同じ大きさ
 
-/* AIライブラリの候補。
-   新しい版は「モジュール形式」なので import で読む。
-   古い版は普通のスクリプトで読める。順に試す。 */
-const AI_LIBS=[
-  {way:'mjs', base:'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/', file:'ort.min.mjs'},
-  {way:'mjs', base:'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/', file:'ort.min.mjs'},
-  {way:'tag', base:'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/', file:'ort.min.js'},
-  {way:'tag', base:'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.3/dist/', file:'ort.min.js'},
-  {way:'mjs', base:'https://unpkg.com/onnxruntime-web@1.20.1/dist/',            file:'ort.min.mjs'},
-];
+/* AIライブラリ。以前は配信サイト(CDN)から取っていたが、同じ場所に置くように変えた。
+
+   理由:
+   ・sw.js は「外部サイトには一切手を出さない」決まりなので、CDNから取ったものは
+     保存庫に入らず、圏外で動かなくなることがあった
+   ・外部への通信が無くなるので、privacy.html を「送信しない」で書き切れる
+   ・CDNが落ちても動く
+
+   通信量は変わらない(同じファイルを、取りに行く先が変わるだけ)。
+   ort/ の中身は onnxruntime-web 1.20.1 の dist から取った3つ。 */
+const AI_LIB={ base:new URL('./ort/', location.href).href, file:'ort.min.mjs' };
 let ort=null, session=null, aiReady=false, aiTried=false, aiError='';
 let aiJob=null;   // 読み込み中の処理。2回目以降の呼び出しは、これが終わるのを待つ
-
-function loadTag(url){
-  return new Promise((res,rej)=>{
-    const el=document.createElement('script');
-    el.src=url;
-    el.onload=()=>res();
-    el.onerror=()=>rej(new Error('取得不可'));
-    document.head.appendChild(el);
-    setTimeout(()=>rej(new Error('時間切れ')),25000);
-  });
-}
 
 function loadAI(){
   if(aiJob) return aiJob;      // すでに始まっていれば、その結果を待つ
@@ -860,29 +850,18 @@ function loadAI(){
 async function loadAIOnce(){
   aiTried=true;
   aiError='';
-  const logs=[];
-  let base=null;
+  const base=AI_LIB.base;
 
-  for(const c of AI_LIBS){
-    const tag=c.way+'@'+(c.base.match(/@([\d.]+)/)||['',''])[1];
-    try{
-      if(c.way==='mjs'){
-        const m=await import(c.base+c.file);
-        if(m && m.InferenceSession){ ort=m; base=c.base; break; }
-        if(window.ort){ ort=window.ort; base=c.base; break; }
-        logs.push(tag+':中身なし');
-      }else{
-        await loadTag(c.base+c.file);
-        if(window.ort){ ort=window.ort; base=c.base; break; }
-        logs.push(tag+':ortなし');
-      }
-    }catch(e){
-      logs.push(tag+':'+String(e.message||e).slice(0,40));
-    }
+  try{
+    const m=await import(base+AI_LIB.file);
+    if(m && m.InferenceSession) ort=m;
+    else if(window.ort) ort=window.ort;
+  }catch(e){
+    aiError='ライブラリ: '+String(e.message||e).slice(0,80);
   }
 
   if(!ort){
-    aiError='ライブラリ不可 ['+logs.slice(0,5).join(' / ')+']';
+    if(!aiError) aiError='ライブラリを読めません';
     return false;
   }
 
