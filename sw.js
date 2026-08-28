@@ -4,7 +4,7 @@
    ・外部サイト(AIライブラリのCDNなど)には一切手を出さない。
      横取りすると読み込みに失敗することがあるため、ブラウザに任せる。
    ・失敗した応答は保存しない。 */
-const CACHE = 'genboku-v28';
+const CACHE = 'genboku-v29';
 const FILES = ['./', './index.html', './manifest.json', './icon.png'];
 
 self.addEventListener('install', e => {

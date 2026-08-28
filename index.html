@@ -34,8 +34,9 @@
     font-variant-numeric:tabular-nums;color:var(--paint);transition:color .15s;}
   #count span{font-size:13px;color:var(--sawn-dim);letter-spacing:.08em;}
   /* 右上：電卓ボタンと版の表示を並べる */
+  /* 最初の画面(#empty)が全画面に出るので、その上に重ねて押せるようにする */
   #topRight{position:fixed;top:calc(12px + env(safe-area-inset-top));right:12px;
-    display:flex;align-items:center;gap:8px;}
+    display:flex;align-items:center;gap:8px;z-index:5;}
   #calcBtn,#camBtn{background:rgba(30,22,16,.86);border:1px solid var(--line);
     color:var(--sawn);border-radius:12px;padding:9px;line-height:0;backdrop-filter:blur(6px);}
   #calcBtn svg,#camBtn svg{width:26px;height:26px;display:block;}
@@ -323,7 +324,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v28';
+const APP_VER='v29';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -582,42 +583,40 @@ async function load(file){
 }
 
 let loading=false;
-let countAfterLoad=false;   // カメラで撮った時は、読み込んだ流れでそのまま数える
+let fromCamera=false;   // カメラで撮った写真か（撮った写真は手元に残す）
 fileInput.addEventListener('change',async e=>{
   const f=e.target.files&&e.target.files[0];
   if(!f||loading) return;
   loading=true;
   try{
     await load(f);
-    if(countAfterLoad){
-      countAfterLoad=false;
-      busy.textContent='AIを準備しています…';
-      busy.classList.remove('hide');
-      const ok=await loadAI();
-      busy.classList.add('hide');
-      if(ok) await runAuto();
-      else openAuto();      // AIが使えない時は、本数を決めてもらう画面を出す
+    if(fromCamera){
+      fromCamera=false;
+      // 撮った写真はそのままでは端末に残らないので、保存しておく
+      downloadBlob(f, `genboku_${stamp()}.jpg`);
+      flash('写真を保存しました。「自動」→「数える」で数えられます', 6000);
     }
   }catch(err){
     console.error(err);
     alert('この写真は読み込めませんでした。\n形式がHEICなどの場合はJPEGで撮り直すか、ギャラリーで一度編集・保存してから選んでください。');
   }finally{
     loading=false;
-    countAfterLoad=false;
+    fromCamera=false;
     busy.classList.add('hide'); busy.textContent='写真を読み込み中…';
     fileInput.value='';   // 読み込み完了後にクリア（同じ写真も再選択できる）
   }
 });
 function pickPhoto(){
-  countAfterLoad=false;
+  fromCamera=false;
   fileInput.removeAttribute('capture');   // ギャラリーから選ぶ
   fileInput.click();
 }
 document.getElementById('pick').onclick=pickPhoto;
 document.getElementById('pickBig').onclick=pickPhoto;
-/* カメラ。撮った写真をそのまま数えるところまで一気に進む */
+/* カメラ。撮った写真は読み込むと同時に手元へ保存する。
+   数えるのは今まで通り「自動」→「数える」を押してから。 */
 document.getElementById('camBtn').onclick=()=>{
-  countAfterLoad=true;
+  fromCamera=true;
   fileInput.setAttribute('capture','environment');   // 外側のカメラを開く
   fileInput.click();
 };
