@@ -43,7 +43,11 @@
   #calcBtn:active,#camBtn:active{background:#3A2C1F;}
   #calcBtn.on{border-color:var(--paint);color:var(--paint);background:#3A2C1F;}
   #camBtn{color:var(--paint);}
-  body.erasing #count{top:calc(38px + env(safe-area-inset-top));}
+  /* 上に帯（「消す」「範囲を囲む」）が出ている間は、その分だけ下げる。
+     帯の高さは中身で変わるので、--topbar をJS側から入れる。
+     以前は本数バッジだけ固定値で下げていて、右上のボタンが帯に被っていた。 */
+  body.hasTopBar #count{top:calc(var(--topbar,0px) + 8px);}
+  body.hasTopBar #topRight{top:calc(var(--topbar,0px) + 10px);}
   #ver{font-size:11px;color:var(--sawn-dim);background:rgba(30,22,16,.8);
     border:1px solid var(--line);border-radius:8px;padding:6px 9px;letter-spacing:.05em;
     backdrop-filter:blur(6px);white-space:nowrap;font-family:inherit;}
@@ -355,7 +359,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v33';
+const APP_VER='v34';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -388,7 +392,7 @@ function resize(){
   if(img) fitS=Math.min(cv.clientWidth/img.width, cv.clientHeight/img.height);
   draw();
 }
-window.addEventListener('resize',resize);
+window.addEventListener('resize',()=>{ resize(); fitTopBar(); });
 
 function fitView(){
   if(!img) return;
@@ -683,6 +687,7 @@ eraseBtn.onclick=()=>{
   eraseBanner.classList.toggle('hide',!eraseMode);
   countBox.classList.remove('hide');
   document.body.classList.toggle('erasing',eraseMode);
+  fitTopBar();
   vib(15);
 };
 document.getElementById('fit').onclick=fitView;
@@ -1038,6 +1043,18 @@ const autoPanel=document.getElementById('autoPanel'), autoMsg=document.getElemen
 const guess=document.getElementById('guess'), guessVal=document.getElementById('guessVal');
 const SENS=4;   // 感度は固定（利用者に選ばせない）
 
+/* 上に出ている帯の高さを測って、上に置いてあるものを下げる。
+   帯は中身で高さが変わる（範囲指定の帯は説明文の分だけ背が高い）ので、
+   固定値ではなく実測に合わせる。 */
+function fitTopBar(){
+  const bars=['eraseBanner','roiBanner']
+    .map(id=>document.getElementById(id))
+    .filter(el=>el && !el.classList.contains('hide'));
+  const h=bars.reduce((m,el)=>Math.max(m, el.getBoundingClientRect().bottom), 0);
+  document.body.classList.toggle('hasTopBar', h>0);
+  document.documentElement.style.setProperty('--topbar', Math.round(h)+'px');
+}
+
 function placePanels(){
   const b=bar.offsetHeight+8;
   autoPanel.style.bottom=b+'px'; panel.style.bottom=b+'px'; hint.style.bottom=(b+6)+'px';
@@ -1199,17 +1216,20 @@ function updateRoiBanner(){
     : '続けてタップして角を足してください。指を動かせば拡大・移動もできます';
   roiUndoBtn.disabled = n===0;
   roiFinishBtn.disabled = n<3;
+  fitTopBar();          // 説明文が変わると帯の高さも変わる
 }
 function startRoi(){
   roiMode=true; roiDraft=[];
   autoPanel.classList.add('hide');
   roiBanner.classList.remove('hide');
+  fitTopBar();                             // 上の帯に被らないよう、上のものを下げる
   updateRoiBanner();
   draw();
 }
 function endRoi(){
   roiMode=false; roiDraft=[];
   roiBanner.classList.add('hide');
+  fitTopBar();
   autoPanel.classList.remove('hide'); placePanels();
   draw();
 }
