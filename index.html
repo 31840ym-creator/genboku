@@ -355,7 +355,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v32';
+const APP_VER='v33';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -546,12 +546,35 @@ function tap(x,y){
 }
 function vib(ms){ if(navigator.vibrate) navigator.vibrate(ms); }
 
+/* 音を出せる状態にしておく。
+   スマホは「画面を触った時」でないと音を許してくれないので、
+   最初のタップで先に用意しておく。
+   ここを踏まないと、鳴らそうとした時にはもう手遅れになる。 */
+function unlockAudio(){
+  try{
+    ac=ac||new (window.AudioContext||window.webkitAudioContext)();
+    if(ac.state!=='running') ac.resume();
+  }catch(_){}
+}
+addEventListener('pointerdown', unlockAudio, {once:true});
+addEventListener('touchstart', unlockAudio, {once:true});
+
 /* タップ音：10本ごとに高い音で区切りが分かる */
 function beep(kind){
   if(!soundOn) return;
   try{
     ac=ac||new (window.AudioContext||window.webkitAudioContext)();
-    if(ac.state==='suspended') ac.resume();
+    if(ac.state!=='running'){
+      // まだ動いていない時は、動き出してから鳴らす。
+      // resume() は非同期なので、待たずに時刻を取ると「過去」を指してしまい無音になる
+      ac.resume().then(()=>ring(kind)).catch(()=>{});
+      return;
+    }
+    ring(kind);
+  }catch(_){}
+}
+function ring(kind){
+  try{
     const t=ac.currentTime;
     const o=ac.createOscillator(), g=ac.createGain();
     o.type= kind==='del' ? 'sawtooth' : 'square';
@@ -667,6 +690,27 @@ document.getElementById('clear').onclick=()=>{
   if(marks.length&&confirm('印を全部消しますか？')){ marks=[]; updateCount(); draw(); }
 };
 
+/* ---- 見た目の設定を覚えておく ----
+   色・大きさ・番号・音・数え方を端末に残し、次に開いた時も同じにする。
+   写真や印は残さない（毎回まっさらから始める道具なので）。 */
+const PREF_KEY='genboku-pref';
+function savePref(){
+  try{
+    localStorage.setItem(PREF_KEY, JSON.stringify({
+      color:markColor, size:markR, nums:showNums, snd:soundOn, conf:confValue
+    }));
+  }catch(e){}
+}
+function loadPref(){
+  let d={};
+  try{ d=JSON.parse(localStorage.getItem(PREF_KEY)||'{}'); }catch(e){ return; }
+  if(COLORS.includes(d.color)) markColor=d.color;
+  if(typeof d.size==='number' && d.size>=8 && d.size<=36) markR=d.size;
+  if(typeof d.nums==='boolean') showNums=d.nums;
+  if(typeof d.snd==='boolean') soundOn=d.snd;
+  if(typeof d.conf==='number' && CONF_OPTS.some(o=>o.v===d.conf)) confValue=d.conf;
+}
+
 /* ---- 見た目（色・大きさ・番号） ---- */
 const lookBtn=document.getElementById('look');
 function closeLook(){ panel.classList.add('hide'); lookBtn.classList.remove('on'); }
@@ -685,7 +729,7 @@ COLORS.forEach(c=>{
   b.onclick=()=>{
     markColor=c;
     [...swWrap.children].forEach(x=>x.setAttribute('aria-pressed', x===b));
-    numEl.style.color=c; drawPreview(); draw();
+    numEl.style.color=c; drawPreview(); draw(); savePref();
   };
   swWrap.appendChild(b);
 });
@@ -696,12 +740,13 @@ function drawPreview(){
     background:${rgba(markColor,.42)};border:2px solid ${markColor}"></span>`;
 }
 sizeInput.addEventListener('input',()=>{ markR=+sizeInput.value; drawPreview(); draw(); });
+sizeInput.addEventListener('change',savePref);   // 動かし終わった時だけ保存する
 const togNum=document.getElementById('togNum');
 togNum.onclick=()=>{
   showNums=!showNums;
   togNum.classList.toggle('on',showNums);
   togNum.textContent=showNums?'番号を表示する':'番号を表示しない';
-  draw();
+  draw(); savePref();
 };
 const togSnd=document.getElementById('togSnd');
 togSnd.onclick=()=>{
@@ -709,6 +754,7 @@ togSnd.onclick=()=>{
   togSnd.classList.toggle('on',soundOn);
   togSnd.textContent=soundOn?'タップ音を鳴らす':'タップ音を消す';
   if(soundOn) beep('add');   // 音量の確認用
+  savePref();
 };
 drawPreview();
 
@@ -1033,6 +1079,7 @@ CONF_OPTS.forEach(o=>{
     confValue=o.v;
     [...confBtns.children].forEach(x=>x.classList.remove('on'));
     b.classList.add('on');
+    savePref();
   };
   confBtns.appendChild(b);
 });
@@ -1587,6 +1634,27 @@ bindGrab(savePanel, closeSave);
 bindGrab(panel, closeLook);
 bindGrab(calcPanel, closeCalc);
 bindGrab(setPanel, closeSet);
+
+/* 前回の見た目を読み込んで、画面に反映する。
+   CONF_OPTS などを作り終えた後でないと反映できないので、ここで行う。 */
+loadPref();
+(function applyPref(){
+  [...swWrap.children].forEach(b=>
+    b.setAttribute('aria-pressed', b.style.background===markColor || rgbToHex(b.style.background)===markColor));
+  numEl.style.color=markColor;
+  sizeInput.value=markR; drawPreview();
+  togNum.classList.toggle('on',showNums);
+  togNum.textContent=showNums?'番号を表示する':'番号を表示しない';
+  togSnd.classList.toggle('on',soundOn);
+  togSnd.textContent=soundOn?'タップ音を鳴らす':'タップ音を消す';
+  [...confBtns.children].forEach((b,i)=>b.classList.toggle('on', CONF_OPTS[i].v===confValue));
+})();
+/* ブラウザが color を rgb() 形式で返すことがあるので、比べる前に揃える */
+function rgbToHex(v){
+  const m=/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/.exec(v||'');
+  if(!m) return v;
+  return '#'+[1,2,3].map(i=>(+m[i]).toString(16).padStart(2,'0')).join('').toUpperCase();
+}
 
 resize();
 </script>
