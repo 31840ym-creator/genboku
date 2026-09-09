@@ -68,6 +68,10 @@
   .setLink::after{content:'›';color:var(--sawn-dim);font-size:17px;}
   .setLink.soon{color:var(--sawn-dim);pointer-events:none;}
   .setLink.soon::after{content:'準備中';font-size:11px;}
+  #setSound{margin-top:14px;width:100%;}
+  #setSoundMsg{font-size:11.5px;line-height:1.6;color:var(--sawn-dim);margin-top:8px;}
+  #setSoundMsg.ng{color:#FF8A5C;}
+  #setSoundMsg.ok{color:#7CFF3B;}
   #setReset{margin-top:14px;width:100%;}
 
   #empty{position:fixed;inset:0;display:flex;flex-direction:column;
@@ -126,6 +130,12 @@
   #panel{position:fixed;left:8px;right:8px;bottom:calc(84px + env(safe-area-inset-bottom));
     background:rgba(38,30,22,.97);border:1px solid var(--line);border-radius:16px;
     padding:14px 16px 16px;backdrop-filter:blur(8px);}
+  /* 範囲を囲った後。囲んだ形を確かめられるよう、写真を隠さない細い帯で出す */
+  #roiGo{position:fixed;left:8px;right:8px;bottom:150px;display:flex;gap:8px;
+    max-width:420px;margin:0 auto;}
+  #roiGo .act{padding:14px 4px;font-size:14px;}
+  #roiGo .act.ghost{flex:0 0 96px;}
+
   /* 電卓。荷台ごとの本数を足したい時などに使う */
   #calcPanel{position:fixed;left:8px;right:8px;bottom:150px;
     background:#000;border:1px solid #333;border-radius:16px;
@@ -245,7 +255,7 @@
   </div>
   <div class="row">
     <span class="lab">大きさ</span>
-    <input type="range" id="size" min="8" max="36" step="1" value="15">
+    <input type="range" id="size" min="4" max="18" step="1" value="11">
     <span id="preview"></span>
   </div>
   <div class="row">
@@ -303,6 +313,11 @@
   </div>
 </div>
 
+<div id="roiGo" class="hide">
+  <button id="roiGoBtn" class="act">この範囲で数える</button>
+  <button id="roiRedo" class="act ghost">やり直す</button>
+</div>
+
 <div id="setPanel" class="hide">
   <div class="grab" aria-label="つまんで下げると閉じます"></div>
   <div class="setHead">設定</div>
@@ -310,6 +325,8 @@
   <div class="setRow"><span>AI</span><b id="setAI">-</b></div>
   <div class="setRow"><span>数え方</span><b id="setConf">-</b></div>
   <div id="setLegal"></div>
+  <button id="setSound" class="sub">音を試す</button>
+  <div id="setSoundMsg"></div>
   <button id="setReset" class="sub">うまく動かない時：保存庫を作り直す</button>
 </div>
 
@@ -359,7 +376,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v34';
+const APP_VER='v35';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -370,7 +387,7 @@ const hint=document.getElementById('hint'), panel=document.getElementById('panel
 const busy=document.getElementById('busy');
 
 let img=null, curURL=null, marks=[], view={s:1,x:0,y:0};
-let showNums=true, markR=15, markColor='#FF5A1F', dpr=1;
+let showNums=true, markR=11, markColor='#FF5A1F', dpr=1;
 let fitS=1, soundOn=true, ac=null, eraseMode=false;
 
 const COLORS=['#FF5A1F','#FF2D95','#FFD400','#7CFF3B','#00C6FF','#FFFFFF'];
@@ -619,6 +636,8 @@ async function load(file){
     img=bmp; curURL=url;
     marks=[]; view={s:1,x:0,y:0}; updateCount();
     gdata=null; roi=null; roiMode=false; roiDraft=[]; guide=false;
+    document.getElementById('roiGo').classList.add('hide');
+    document.getElementById('roiAll').classList.add('hide');
     logR=0;
     document.getElementById('autoPanel').classList.add('hide');
     eraseMode=false;
@@ -710,7 +729,7 @@ function loadPref(){
   let d={};
   try{ d=JSON.parse(localStorage.getItem(PREF_KEY)||'{}'); }catch(e){ return; }
   if(COLORS.includes(d.color)) markColor=d.color;
-  if(typeof d.size==='number' && d.size>=8 && d.size<=36) markR=d.size;
+  if(typeof d.size==='number' && d.size>=4 && d.size<=18) markR=d.size;
   if(typeof d.nums==='boolean') showNums=d.nums;
   if(typeof d.snd==='boolean') soundOn=d.snd;
   if(typeof d.conf==='number' && CONF_OPTS.some(o=>o.v===d.conf)) confValue=d.conf;
@@ -720,7 +739,7 @@ function loadPref(){
 const lookBtn=document.getElementById('look');
 function closeLook(){ panel.classList.add('hide'); lookBtn.classList.remove('on'); }
 /* パネルは同じ場所に出るので、1枚だけ開くようにする */
-function closePanels(){ closeAuto(); closeSave(); closeCalc(); closeLook(); closeSet(); }
+function closePanels(){ closeAuto(); closeSave(); closeCalc(); closeLook(); closeSet(); showRoiGo(false); }
 lookBtn.onclick=()=>{
   if(!panel.classList.contains('hide')){ closeLook(); return; }
   closePanels();
@@ -1058,7 +1077,7 @@ function fitTopBar(){
 function placePanels(){
   const b=bar.offsetHeight+8;
   autoPanel.style.bottom=b+'px'; panel.style.bottom=b+'px'; hint.style.bottom=(b+6)+'px';
-  calcPanel.style.bottom=b+'px';
+  calcPanel.style.bottom=b+'px'; roiGo.style.bottom=b+'px';
   /* 画面の低い端末だと、パネルが本数バッジや右上のボタンに被る。
      上に置いてあるものの下から、下のバーまでの高さに収める。 */
   const topEnd=Math.max(
@@ -1168,7 +1187,7 @@ async function runAuto(){
     pts.sort((a,b)=> Math.abs(a.y-b.y)>rowH ? a.y-b.y : a.x-b.x);
     marks=pts;
     guide=false; updateCount();
-    roi=null; document.getElementById('roiAll').classList.add('hide');
+    roi=null; document.getElementById('roiAll').classList.add('hide'); showRoiGo(false);
     draw();
     // 数え終わったら写真を確かめたいので、パネルは畳んで写真を見せる
     closeAuto();
@@ -1226,17 +1245,26 @@ function startRoi(){
   updateRoiBanner();
   draw();
 }
-function endRoi(){
+function endRoi(backToPanel=true){
   roiMode=false; roiDraft=[];
   roiBanner.classList.add('hide');
   fitTopBar();
-  autoPanel.classList.remove('hide'); placePanels();
+  if(backToPanel){ autoPanel.classList.remove('hide'); placePanels(); }
   draw();
+}
+
+/* 範囲を囲った後は、囲んだ形を確かめられるよう写真を隠さない。
+   パネルの代わりに「数える」だけを下に細く出す。 */
+const roiGo=document.getElementById('roiGo');
+function showRoiGo(on){
+  roiGo.classList.toggle('hide', !on);
+  if(on) placePanels();
 }
 document.getElementById('roiBtn').onclick=startRoi;
 roiUndoBtn.onclick=()=>{ roiDraft.pop(); updateRoiBanner(); draw(); };
 document.getElementById('roiCancel').onclick=()=>{
   autoMsg.textContent='範囲の指定をやめました。';
+  showRoiGo(false);
   endRoi();
 };
 roiFinishBtn.onclick=()=>{
@@ -1245,13 +1273,24 @@ roiFinishBtn.onclick=()=>{
   for(const p of roiDraft){ x0=Math.min(x0,p.x); y0=Math.min(y0,p.y); x1=Math.max(x1,p.x); y1=Math.max(y1,p.y); }
   roi={points:roiDraft.slice(), x0,y0,x1,y1};
   document.getElementById('roiAll').classList.remove('hide');
-  autoMsg.textContent='範囲を指定しました。「自動」を押すと数えられます。';
-  endRoi();
+  autoMsg.textContent='範囲を指定しました。';
+  endRoi(false);          // パネルは出さない（囲んだ形が見えるように）
+  showRoiGo(true);
+  flash('囲んだ範囲を確かめてください', 6000);
 };
 document.getElementById('roiAll').onclick=()=>{
   roi=null; roiMode=false; roiDraft=[];
   document.getElementById('roiAll').classList.add('hide');
+  showRoiGo(false);
   autoMsg.textContent='範囲を解除しました。写真全体から数えます。'; draw();
+};
+/* 囲んだ範囲でそのまま数える */
+document.getElementById('roiGoBtn').onclick=()=>{ showRoiGo(false); runAuto(); };
+/* 囲み直す */
+document.getElementById('roiRedo').onclick=()=>{
+  roi=null; document.getElementById('roiAll').classList.add('hide');
+  showRoiGo(false); draw();
+  startRoi();
 };
 
 /* ---- 印つき画像を保存 ---- */
@@ -1420,6 +1459,52 @@ verBtn.onclick=()=>{
   setPanel.classList.remove('hide');
   verBtn.classList.add('on');
   placePanels();
+};
+
+/* 音が鳴らない時の切り分け。実際に鳴らして、その波形を測る。
+   ・波が出ている  → アプリは鳴らしている。端末側(音量・消音スイッチ)の問題
+   ・波が出ていない → アプリ側の問題
+   iPhoneは本体横の消音スイッチでWebアプリの音も消えるが、
+   その場合でも波形は出るので、ここで見分けられる。 */
+document.getElementById('setSound').onclick=async ()=>{
+  const msg=document.getElementById('setSoundMsg');
+  msg.className=''; msg.textContent='鳴らしています…';
+  const wasOn=soundOn; soundOn=true;
+  try{
+    unlockAudio();
+    if(ac && ac.state!=='running'){ try{ await ac.resume(); }catch(_){} }
+    if(!ac) throw new Error('音の仕組みを作れませんでした');
+
+    const an=ac.createAnalyser(); an.fftSize=2048;
+    const out=ac.destination;
+    Object.defineProperty(ac,'destination',{value:an,configurable:true});
+    an.connect(out);
+
+    let peak=0;
+    beep('ten');
+    for(let i=0;i<30;i++){
+      await new Promise(r=>setTimeout(r,8));
+      const b=new Float32Array(an.fftSize);
+      an.getFloatTimeDomainData(b);
+      for(const v of b){ const a=Math.abs(v); if(a>peak) peak=a; }
+    }
+    Object.defineProperty(ac,'destination',{value:out,configurable:true});
+
+    if(peak>0.01){
+      msg.className='ok';
+      msg.innerHTML='アプリは音を鳴らしています（強さ '+peak.toFixed(2)+'）。<br>'+
+        '聞こえない時は、端末の音量と、iPhoneなら本体横の消音スイッチを確かめてください。';
+    }else{
+      msg.className='ng';
+      msg.innerHTML='音が出ていません（状態 '+ac.state+'、強さ '+peak.toFixed(3)+'）。<br>'+
+        'この表示をそのまま伝えてください。';
+    }
+  }catch(e){
+    msg.className='ng';
+    msg.textContent='音を試せませんでした：'+String(e.message||e);
+  }finally{
+    soundOn=wasOn;
+  }
 };
 
 /* 「前の版のまま」「AIが読めない」時の逃げ道。
