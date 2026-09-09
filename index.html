@@ -376,7 +376,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v36';
+const APP_VER='v37';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -562,8 +562,11 @@ function tap(x,y){
     }
     return; // 印のない所をタップしても何も起きない
   }
-  marks.push(toImage(sx,sy)); updateCount(); draw(); vib(12);
-  beep(marks.length%10===0?'ten':'add');
+  marks.push(toImage(sx,sy)); updateCount(); draw();
+  // 10本ごとは振動でも区切りが分かるようにする（音が使えない現場向け）
+  const ten = marks.length%10===0;
+  vib(ten ? [18,60,18] : 12);
+  beep(ten?'ten':'add');
 }
 function vib(ms){ if(navigator.vibrate) navigator.vibrate(ms); }
 
@@ -1508,10 +1511,15 @@ document.getElementById('setSound').onclick=async ()=>{
     if(peak>0.01){
       msg.className='ok';
       msg.innerHTML='アプリは音を鳴らしています（強さ '+peak.toFixed(2)+'）。<br>'+
-        'それでも聞こえない時は端末側の設定です。<br>'+
-        '・Android：<b>メディアの音量</b>を上げる（音が鳴っている最中に音量ボタンを押す）。'+
-        '音が出ていない時に押すと着信音の方が変わり、メディアは0のままになります<br>'+
-        '・iPhone：本体横の<b>消音スイッチ</b>を確かめる';
+        '<b>それでも聞こえない時は、音が別の場所へ流れているか、ブラウザが止めています。</b>'+
+        '上から順に確かめてください。<br>'+
+        '① <b>Bluetooth</b>が車のオーディオやイヤホンに繋がっていないか（音はそちらへ出ます）<br>'+
+        '② ブラウザの<b>サイトごとの音の設定</b>がブロックになっていないか<br>'+
+        '　（アドレス欄の鍵マーク→サイトの設定→音）<br>'+
+        '③ <b>メディアの音量</b>（音が鳴っている最中に音量ボタンを押す）<br>'+
+        '④ 音楽や地図など<b>他のアプリ</b>を一度終了してから試す<br>'+
+        '⑤ iPhoneなら本体横の<b>消音スイッチ</b><br>'+
+        'なお、タップの手応えは<b>振動</b>でも分かります（10本ごとに長め）。';
     }else{
       msg.className='ng';
       msg.innerHTML='音が出ていません（状態 '+ac.state+'、強さ '+peak.toFixed(3)+'）。<br>'+
