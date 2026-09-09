@@ -376,7 +376,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v37';
+const APP_VER='v38';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -1469,6 +1469,29 @@ verBtn.onclick=()=>{
    ・波が出ていない → アプリ側の問題
    iPhoneは本体横の消音スイッチでWebアプリの音も消えるが、
    その場合でも波形は出るので、ここで見分けられる。 */
+/* 鳴らし方は2通りある。どちらが聞こえるかで原因が分かれる。
+   ①いまアプリが使っている仕組み（Web Audio）
+   ②音楽の再生と同じ仕組み（audioタグ）
+   ①だけ駄目なら、②に切り替えれば直せる。 */
+function toneWav(freq, sec, vol){
+  const sr=22050, n=Math.floor(sr*sec);
+  const buf=new ArrayBuffer(44+n*2), v=new DataView(buf);
+  const w=(o,s)=>{ for(let i=0;i<s.length;i++) v.setUint8(o+i, s.charCodeAt(i)); };
+  w(0,'RIFF'); v.setUint32(4,36+n*2,true); w(8,'WAVE'); w(12,'fmt ');
+  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true);
+  w(36,'data'); v.setUint32(40,n*2,true);
+  for(let i=0;i<n;i++){
+    const t=i/sr;
+    const env=Math.min(1, t*40, (sec-t)*10);
+    const s=Math.sin(2*Math.PI*freq*t)*vol*env*(t%0.5<0.3?1:0);   // ピポピポ
+    v.setInt16(44+i*2, Math.max(-1,Math.min(1,s))*32767, true);
+  }
+  let bin=''; const b=new Uint8Array(buf);
+  for(let i=0;i<b.length;i++) bin+=String.fromCharCode(b[i]);
+  return 'data:audio/wav;base64,'+btoa(bin);
+}
+
 document.getElementById('setSound').onclick=async ()=>{
   const msg=document.getElementById('setSoundMsg');
   msg.className=''; msg.textContent='鳴らしています…';
@@ -1486,7 +1509,7 @@ document.getElementById('setSound').onclick=async ()=>{
     /* 鳴っている間に音量ボタンを押せるよう、長め(約3秒)に鳴らす。
        Androidは音が出ていない時に音量ボタンを押すと着信音の方が変わり、
        メディア音量は0のまま、ということが起きる。 */
-    msg.innerHTML='鳴らしています…<br><b>いま音量ボタンを押して上げてみてください</b>';
+    msg.innerHTML='<b>①いまの仕組みで鳴らしています…</b><br>いま音量ボタンを押して上げてみてください';
     const t0=ac.currentTime;
     const o=ac.createOscillator(), gn=ac.createGain();
     o.type='square';
@@ -1508,23 +1531,32 @@ document.getElementById('setSound').onclick=async ()=>{
     }
     Object.defineProperty(ac,'destination',{value:out,configurable:true});
 
-    if(peak>0.01){
-      msg.className='ok';
-      msg.innerHTML='アプリは音を鳴らしています（強さ '+peak.toFixed(2)+'）。<br>'+
-        '<b>それでも聞こえない時は、音が別の場所へ流れているか、ブラウザが止めています。</b>'+
-        '上から順に確かめてください。<br>'+
-        '① <b>Bluetooth</b>が車のオーディオやイヤホンに繋がっていないか（音はそちらへ出ます）<br>'+
-        '② ブラウザの<b>サイトごとの音の設定</b>がブロックになっていないか<br>'+
-        '　（アドレス欄の鍵マーク→サイトの設定→音）<br>'+
-        '③ <b>メディアの音量</b>（音が鳴っている最中に音量ボタンを押す）<br>'+
-        '④ 音楽や地図など<b>他のアプリ</b>を一度終了してから試す<br>'+
-        '⑤ iPhoneなら本体横の<b>消音スイッチ</b><br>'+
-        'なお、タップの手応えは<b>振動</b>でも分かります（10本ごとに長め）。';
-    }else{
-      msg.className='ng';
-      msg.innerHTML='音が出ていません（状態 '+ac.state+'、強さ '+peak.toFixed(3)+'）。<br>'+
-        'この表示をそのまま伝えてください。';
-    }
+    // ② 音楽の再生と同じ仕組みでも鳴らしてみる
+    msg.innerHTML='<b>②別の仕組みで鳴らしています…</b><br>こちらは聞こえますか';
+    let two='鳴らせませんでした';
+    try{
+      const el=new Audio(toneWav(880, 2.2, 0.6));
+      el.volume=1;
+      await el.play();
+      await new Promise(r=>setTimeout(r,2400));
+      two='鳴らせました';
+    }catch(e){ two='鳴らせませんでした（'+String(e.name||e.message||e)+'）'; }
+
+    const standalone = matchMedia('(display-mode: standalone)').matches ? 'ホーム画面のアプリ' : 'ブラウザ';
+    const info='<br><span style="opacity:.7">［①強さ '+peak.toFixed(2)+' ／ 状態 '+ac.state+
+               ' ／ ②'+two+' ／ '+standalone+'］</span>';
+
+    msg.className = peak>0.01 ? 'ok' : 'ng';
+    msg.innerHTML='①と②、<b>どちらが聞こえましたか。</b><br>'+
+      '・<b>②だけ聞こえた</b> → 鳴らし方を②に変えれば直せます。お知らせください<br>'+
+      '・<b>どちらも聞こえない</b> → 端末側です。順に確かめてください<br>'+
+      '　1. Bluetooth（車のオーディオ・イヤホン）を切る<br>'+
+      '　2. ブラウザの<b>サイトごとの音の設定</b>（アドレス欄の鍵マーク→サイトの設定→音）<br>'+
+      '　3. 音楽や地図など<b>他のアプリを終了</b>してから試す<br>'+
+      '　4. 端末を<b>再起動</b>する<br>'+
+      '　5. 他のサイト（動画など）で音が出るか試す。'+
+      'そこでも出なければ端末全体の問題です<br>'+
+      'タップの手応えは<b>振動</b>でも分かります（10本ごとに長め）。'+info;
   }catch(e){
     msg.className='ng';
     msg.textContent='音を試せませんでした：'+String(e.message||e);
