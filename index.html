@@ -376,7 +376,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v35';
+const APP_VER='v36';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -1480,10 +1480,25 @@ document.getElementById('setSound').onclick=async ()=>{
     Object.defineProperty(ac,'destination',{value:an,configurable:true});
     an.connect(out);
 
+    /* 鳴っている間に音量ボタンを押せるよう、長め(約3秒)に鳴らす。
+       Androidは音が出ていない時に音量ボタンを押すと着信音の方が変わり、
+       メディア音量は0のまま、ということが起きる。 */
+    msg.innerHTML='鳴らしています…<br><b>いま音量ボタンを押して上げてみてください</b>';
+    const t0=ac.currentTime;
+    const o=ac.createOscillator(), gn=ac.createGain();
+    o.type='square';
+    for(let i=0;i<6;i++){                       // ピポピポと6回、約3秒
+      o.frequency.setValueAtTime(i%2?1320:880, t0+i*0.5);
+      gn.gain.setValueAtTime(0.0001, t0+i*0.5);
+      gn.gain.exponentialRampToValueAtTime(0.5, t0+i*0.5+0.01);
+      gn.gain.exponentialRampToValueAtTime(0.0001, t0+i*0.5+0.4);
+    }
+    o.connect(gn); gn.connect(ac.destination);
+    o.start(t0); o.stop(t0+3.1);
+
     let peak=0;
-    beep('ten');
-    for(let i=0;i<30;i++){
-      await new Promise(r=>setTimeout(r,8));
+    for(let i=0;i<160;i++){
+      await new Promise(r=>setTimeout(r,20));
       const b=new Float32Array(an.fftSize);
       an.getFloatTimeDomainData(b);
       for(const v of b){ const a=Math.abs(v); if(a>peak) peak=a; }
@@ -1493,7 +1508,10 @@ document.getElementById('setSound').onclick=async ()=>{
     if(peak>0.01){
       msg.className='ok';
       msg.innerHTML='アプリは音を鳴らしています（強さ '+peak.toFixed(2)+'）。<br>'+
-        '聞こえない時は、端末の音量と、iPhoneなら本体横の消音スイッチを確かめてください。';
+        'それでも聞こえない時は端末側の設定です。<br>'+
+        '・Android：<b>メディアの音量</b>を上げる（音が鳴っている最中に音量ボタンを押す）。'+
+        '音が出ていない時に押すと着信音の方が変わり、メディアは0のままになります<br>'+
+        '・iPhone：本体横の<b>消音スイッチ</b>を確かめる';
     }else{
       msg.className='ng';
       msg.innerHTML='音が出ていません（状態 '+ac.state+'、強さ '+peak.toFixed(3)+'）。<br>'+
