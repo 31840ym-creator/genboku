@@ -68,10 +68,6 @@
   .setLink::after{content:'›';color:var(--sawn-dim);font-size:17px;}
   .setLink.soon{color:var(--sawn-dim);pointer-events:none;}
   .setLink.soon::after{content:'準備中';font-size:11px;}
-  #setSound{margin-top:14px;width:100%;}
-  #setSoundMsg{font-size:11.5px;line-height:1.6;color:var(--sawn-dim);margin-top:8px;}
-  #setSoundMsg.ng{color:#FF8A5C;}
-  #setSoundMsg.ok{color:#7CFF3B;}
   #setReset{margin-top:14px;width:100%;}
 
   #empty{position:fixed;inset:0;display:flex;flex-direction:column;
@@ -325,8 +321,6 @@
   <div class="setRow"><span>AI</span><b id="setAI">-</b></div>
   <div class="setRow"><span>数え方</span><b id="setConf">-</b></div>
   <div id="setLegal"></div>
-  <button id="setSound" class="sub">音を試す</button>
-  <div id="setSoundMsg"></div>
   <button id="setReset" class="sub">うまく動かない時：保存庫を作り直す</button>
 </div>
 
@@ -376,7 +370,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v38';
+const APP_VER='v39';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -1462,107 +1456,6 @@ verBtn.onclick=()=>{
   setPanel.classList.remove('hide');
   verBtn.classList.add('on');
   placePanels();
-};
-
-/* 音が鳴らない時の切り分け。実際に鳴らして、その波形を測る。
-   ・波が出ている  → アプリは鳴らしている。端末側(音量・消音スイッチ)の問題
-   ・波が出ていない → アプリ側の問題
-   iPhoneは本体横の消音スイッチでWebアプリの音も消えるが、
-   その場合でも波形は出るので、ここで見分けられる。 */
-/* 鳴らし方は2通りある。どちらが聞こえるかで原因が分かれる。
-   ①いまアプリが使っている仕組み（Web Audio）
-   ②音楽の再生と同じ仕組み（audioタグ）
-   ①だけ駄目なら、②に切り替えれば直せる。 */
-function toneWav(freq, sec, vol){
-  const sr=22050, n=Math.floor(sr*sec);
-  const buf=new ArrayBuffer(44+n*2), v=new DataView(buf);
-  const w=(o,s)=>{ for(let i=0;i<s.length;i++) v.setUint8(o+i, s.charCodeAt(i)); };
-  w(0,'RIFF'); v.setUint32(4,36+n*2,true); w(8,'WAVE'); w(12,'fmt ');
-  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
-  v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true);
-  w(36,'data'); v.setUint32(40,n*2,true);
-  for(let i=0;i<n;i++){
-    const t=i/sr;
-    const env=Math.min(1, t*40, (sec-t)*10);
-    const s=Math.sin(2*Math.PI*freq*t)*vol*env*(t%0.5<0.3?1:0);   // ピポピポ
-    v.setInt16(44+i*2, Math.max(-1,Math.min(1,s))*32767, true);
-  }
-  let bin=''; const b=new Uint8Array(buf);
-  for(let i=0;i<b.length;i++) bin+=String.fromCharCode(b[i]);
-  return 'data:audio/wav;base64,'+btoa(bin);
-}
-
-document.getElementById('setSound').onclick=async ()=>{
-  const msg=document.getElementById('setSoundMsg');
-  msg.className=''; msg.textContent='鳴らしています…';
-  const wasOn=soundOn; soundOn=true;
-  try{
-    unlockAudio();
-    if(ac && ac.state!=='running'){ try{ await ac.resume(); }catch(_){} }
-    if(!ac) throw new Error('音の仕組みを作れませんでした');
-
-    const an=ac.createAnalyser(); an.fftSize=2048;
-    const out=ac.destination;
-    Object.defineProperty(ac,'destination',{value:an,configurable:true});
-    an.connect(out);
-
-    /* 鳴っている間に音量ボタンを押せるよう、長め(約3秒)に鳴らす。
-       Androidは音が出ていない時に音量ボタンを押すと着信音の方が変わり、
-       メディア音量は0のまま、ということが起きる。 */
-    msg.innerHTML='<b>①いまの仕組みで鳴らしています…</b><br>いま音量ボタンを押して上げてみてください';
-    const t0=ac.currentTime;
-    const o=ac.createOscillator(), gn=ac.createGain();
-    o.type='square';
-    for(let i=0;i<6;i++){                       // ピポピポと6回、約3秒
-      o.frequency.setValueAtTime(i%2?1320:880, t0+i*0.5);
-      gn.gain.setValueAtTime(0.0001, t0+i*0.5);
-      gn.gain.exponentialRampToValueAtTime(0.5, t0+i*0.5+0.01);
-      gn.gain.exponentialRampToValueAtTime(0.0001, t0+i*0.5+0.4);
-    }
-    o.connect(gn); gn.connect(ac.destination);
-    o.start(t0); o.stop(t0+3.1);
-
-    let peak=0;
-    for(let i=0;i<160;i++){
-      await new Promise(r=>setTimeout(r,20));
-      const b=new Float32Array(an.fftSize);
-      an.getFloatTimeDomainData(b);
-      for(const v of b){ const a=Math.abs(v); if(a>peak) peak=a; }
-    }
-    Object.defineProperty(ac,'destination',{value:out,configurable:true});
-
-    // ② 音楽の再生と同じ仕組みでも鳴らしてみる
-    msg.innerHTML='<b>②別の仕組みで鳴らしています…</b><br>こちらは聞こえますか';
-    let two='鳴らせませんでした';
-    try{
-      const el=new Audio(toneWav(880, 2.2, 0.6));
-      el.volume=1;
-      await el.play();
-      await new Promise(r=>setTimeout(r,2400));
-      two='鳴らせました';
-    }catch(e){ two='鳴らせませんでした（'+String(e.name||e.message||e)+'）'; }
-
-    const standalone = matchMedia('(display-mode: standalone)').matches ? 'ホーム画面のアプリ' : 'ブラウザ';
-    const info='<br><span style="opacity:.7">［①強さ '+peak.toFixed(2)+' ／ 状態 '+ac.state+
-               ' ／ ②'+two+' ／ '+standalone+'］</span>';
-
-    msg.className = peak>0.01 ? 'ok' : 'ng';
-    msg.innerHTML='①と②、<b>どちらが聞こえましたか。</b><br>'+
-      '・<b>②だけ聞こえた</b> → 鳴らし方を②に変えれば直せます。お知らせください<br>'+
-      '・<b>どちらも聞こえない</b> → 端末側です。順に確かめてください<br>'+
-      '　1. Bluetooth（車のオーディオ・イヤホン）を切る<br>'+
-      '　2. ブラウザの<b>サイトごとの音の設定</b>（アドレス欄の鍵マーク→サイトの設定→音）<br>'+
-      '　3. 音楽や地図など<b>他のアプリを終了</b>してから試す<br>'+
-      '　4. 端末を<b>再起動</b>する<br>'+
-      '　5. 他のサイト（動画など）で音が出るか試す。'+
-      'そこでも出なければ端末全体の問題です<br>'+
-      'タップの手応えは<b>振動</b>でも分かります（10本ごとに長め）。'+info;
-  }catch(e){
-    msg.className='ng';
-    msg.textContent='音を試せませんでした：'+String(e.message||e);
-  }finally{
-    soundOn=wasOn;
-  }
 };
 
 /* 「前の版のまま」「AIが読めない」時の逃げ道。
