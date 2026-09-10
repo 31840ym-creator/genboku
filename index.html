@@ -106,11 +106,6 @@
   .sub:active{color:#00C6FF;border-color:#2A5A6B;}
   .act.ghost2{background:var(--bark-2);color:#00C6FF;border:1px solid #2A5A6B;}
   #guessVal{width:46px;text-align:right;font-size:12px;color:var(--sawn-dim);}
-  #confBtns{flex:1;display:flex;gap:6px;}
-  #confHint{font-size:11px;color:var(--sawn-dim);margin-top:7px;padding-left:64px;line-height:1.5;}
-  .confBtn{flex:1;background:var(--bark-2);color:var(--sawn-dim);border:1px solid var(--line);
-    border-radius:9px;padding:11px 2px;font-size:14px;font-weight:600;}
-  .confBtn.on{background:var(--paint);color:var(--paint-ink);border-color:var(--paint);}
   #bar button.on{border-color:var(--paint);color:var(--paint);}
   #bar button.erasing{background:#7A1D12;border-color:#FF6B4A;color:#FFD9CF;}
   #eraseBanner{position:fixed;left:0;right:0;top:0;padding:calc(6px + env(safe-area-inset-top)) 8px 6px;
@@ -278,11 +273,6 @@
 <div id="autoPanel" class="hide">
   <div class="grab" aria-label="つまんで下げると閉じます"></div>
   <div id="autoMsg">だいたいの本数を合わせて「数える」を押してください。</div>
-  <div class="row hide" id="aiRow">
-    <span class="lab">数え方</span>
-    <div id="confBtns"></div>
-  </div>
-  <div class="hide" id="confHint">抜けが多い時は「多め」、余分が多い時は「少なめ」</div>
   <div class="row" id="guessRow">
     <span class="lab">本数</span>
     <input type="range" id="guess" min="5" max="300" step="1" value="40">
@@ -370,7 +360,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v39';
+const APP_VER='v40';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -632,7 +622,7 @@ async function load(file){
     if(curURL) URL.revokeObjectURL(curURL);
     img=bmp; curURL=url;
     marks=[]; view={s:1,x:0,y:0}; updateCount();
-    gdata=null; roi=null; roiMode=false; roiDraft=[]; guide=false;
+    gdata=null; roi=null; lastRoi=null; roiMode=false; roiDraft=[]; guide=false;
     document.getElementById('roiGo').classList.add('hide');
     document.getElementById('roiAll').classList.add('hide');
     logR=0;
@@ -712,13 +702,13 @@ document.getElementById('clear').onclick=()=>{
 };
 
 /* ---- 見た目の設定を覚えておく ----
-   色・大きさ・番号・音・数え方を端末に残し、次に開いた時も同じにする。
+   色・大きさ・番号・音を端末に残し、次に開いた時も同じにする。
    写真や印は残さない（毎回まっさらから始める道具なので）。 */
 const PREF_KEY='genboku-pref';
 function savePref(){
   try{
     localStorage.setItem(PREF_KEY, JSON.stringify({
-      color:markColor, size:markR, nums:showNums, snd:soundOn, conf:confValue
+      color:markColor, size:markR, nums:showNums, snd:soundOn
     }));
   }catch(e){}
 }
@@ -729,7 +719,7 @@ function loadPref(){
   if(typeof d.size==='number' && d.size>=4 && d.size<=18) markR=d.size;
   if(typeof d.nums==='boolean') showNums=d.nums;
   if(typeof d.snd==='boolean') soundOn=d.snd;
-  if(typeof d.conf==='number' && CONF_OPTS.some(o=>o.v===d.conf)) confValue=d.conf;
+  // 以前の版で保存された d.conf は読まない（厳しさは0.25に固定したため）
 }
 
 /* ---- 見た目（色・大きさ・番号） ---- */
@@ -786,6 +776,9 @@ drawPreview();
    通信もライブラリも不要。 */
 let gdata=null;                 // 縮小画像のキャッシュ
 let roi=null, roiMode=false, roiDraft=[];   // roi.points は指でタップして作った輪郭（画像座標）
+/* 数え終わると roi は消すが、学習データにはどこを囲ったかを残したいので取っておく。
+   囲いの外に数えていない木口がある写真だと分かれば、後で正しく学習に使える。 */
+let lastRoi=null;
 
 /* 手描きの輪郭を、指定した幅・高さの塗り絵として焼き込む。
    1(内側)/0(外側)の判定に、ピクセルごとの計算ではなくCanvasの塗りつぶしを使う（速い）。 */
@@ -1097,25 +1090,12 @@ guess.addEventListener('input',()=>{ guessVal.textContent=guess.value+'本'; });
      多め   0.20 … 少し多めに出る(偏り +0.2本)
      ふつう 0.25 … 一番釣り合いが良い(偏り +0.1本、ぴったり34/41枚)
      少なめ 0.30 … 余分を減らす(偏り 0.0本) */
-const CONF_OPTS=[
-  {v:0.20, label:'多め'},
-  {v:0.25, label:'ふつう'},
-  {v:0.30, label:'少なめ'},
-];
-let confValue=0.25;
-const confBtns=document.getElementById('confBtns');
-CONF_OPTS.forEach(o=>{
-  const b=document.createElement('button');
-  b.className='confBtn'+(o.v===confValue?' on':'');
-  b.textContent=o.label;
-  b.onclick=()=>{
-    confValue=o.v;
-    [...confBtns.children].forEach(x=>x.classList.remove('on'));
-    b.classList.add('on');
-    savePref();
-  };
-  confBtns.appendChild(b);
-});
+/* AIの厳しさ。以前は「多め/ふつう/少なめ」の3つから選べるようにしていたが、
+   モデルの精度が上がり、0.20〜0.30のどれでも結果がほとんど変わらなくなった
+   （検証41枚で平均のズレ0.4〜0.5本、ぴったり当たるのは同じ34枚）。
+   選べても迷うだけなので、いちばん偏りの小さい0.25に固定した。 */
+const CONF_FIXED=0.25;
+let confValue=CONF_FIXED;
 
 async function openAuto(){
   if(!img) return;
@@ -1125,8 +1105,6 @@ async function openAuto(){
     autoMsg.textContent='AIモデルを準備しています…（初回のみ時間がかかります）';
     await loadAI();
   }
-  document.getElementById('aiRow').classList.toggle('hide', !aiReady);
-  document.getElementById('confHint').classList.toggle('hide', !aiReady);
   document.getElementById('guessRow').classList.toggle('hide', aiReady);
   autoMsg.innerHTML = aiReady
     ? 'AIで数えます。「数える」を押してください。'
@@ -1184,6 +1162,7 @@ async function runAuto(){
     pts.sort((a,b)=> Math.abs(a.y-b.y)>rowH ? a.y-b.y : a.x-b.x);
     marks=pts;
     guide=false; updateCount();
+    lastRoi=roi;   // 学習データ用に、どこを囲って数えたかを覚えておく
     roi=null; document.getElementById('roiAll').classList.add('hide'); showRoiGo(false);
     draw();
     // 数え終わったら写真を確かめたいので、パネルは畳んで写真を見せる
@@ -1276,7 +1255,7 @@ roiFinishBtn.onclick=()=>{
   flash('囲んだ範囲を確かめてください', 6000);
 };
 document.getElementById('roiAll').onclick=()=>{
-  roi=null; roiMode=false; roiDraft=[];
+  roi=null; lastRoi=null; roiMode=false; roiDraft=[];
   document.getElementById('roiAll').classList.add('hide');
   showRoiGo(false);
   autoMsg.textContent='範囲を解除しました。写真全体から数えます。'; draw();
@@ -1381,8 +1360,14 @@ document.getElementById('saveData').onclick=()=>{
       conf: aiReady ? confValue : null,
       sens:SENS,
       guess:+guess.value,
-      roi: roi ? {x0:+(roi.x0/img.width).toFixed(4), y0:+(roi.y0/img.height).toFixed(4),
-                  x1:+(roi.x1/img.width).toFixed(4), y1:+(roi.y1/img.height).toFixed(4)} : null
+      // 囲って数えた場合は、囲いの外に数えていない木口が残る。
+      // 学習に使う時に切り抜けるよう、四角だけでなく指でなぞった形(points)も残す。
+      roi: (roi||lastRoi) ? (r=>({
+              x0:+(r.x0/img.width).toFixed(4),  y0:+(r.y0/img.height).toFixed(4),
+              x1:+(r.x1/img.width).toFixed(4),  y1:+(r.y1/img.height).toFixed(4),
+              points:(r.points||[]).map(p=>({x:+(p.x/img.width).toFixed(4),
+                                             y:+(p.y/img.height).toFixed(4)}))
+           }))(roi||lastRoi) : null
     },
     jpeg_base64:jpeg
   };
@@ -1450,8 +1435,7 @@ verBtn.onclick=()=>{
   document.getElementById('setVer').textContent=APP_VER;
   document.getElementById('setAI').textContent =
     aiReady ? '使えます' : (aiTried ? '使えません' : 'まだ読み込んでいません');
-  const cur=CONF_OPTS.find(o=>o.v===confValue);
-  document.getElementById('setConf').textContent = cur ? cur.label : '-';
+  document.getElementById('setConf').textContent = aiReady ? 'AIで数える' : '写真の明るさで数える';
   drawLegal();
   setPanel.classList.remove('hide');
   verBtn.classList.add('on');
@@ -1692,7 +1676,7 @@ bindGrab(calcPanel, closeCalc);
 bindGrab(setPanel, closeSet);
 
 /* 前回の見た目を読み込んで、画面に反映する。
-   CONF_OPTS などを作り終えた後でないと反映できないので、ここで行う。 */
+   ボタンや入力欄を作り終えた後でないと反映できないので、ここで行う。 */
 loadPref();
 (function applyPref(){
   [...swWrap.children].forEach(b=>
@@ -1703,7 +1687,6 @@ loadPref();
   togNum.textContent=showNums?'番号を表示する':'番号を表示しない';
   togSnd.classList.toggle('on',soundOn);
   togSnd.textContent=soundOn?'タップ音を鳴らす':'タップ音を消す';
-  [...confBtns.children].forEach((b,i)=>b.classList.toggle('on', CONF_OPTS[i].v===confValue));
 })();
 /* ブラウザが color を rgb() 形式で返すことがあるので、比べる前に揃える */
 function rgbToHex(v){
