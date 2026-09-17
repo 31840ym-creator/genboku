@@ -53,8 +53,7 @@
   /* 上に帯（「消す」「範囲を囲む」）が出ている間は、その分だけ下げる。
      帯の高さは中身で変わるので、--topbar をJS側から入れる。
      以前は本数バッジだけ固定値で下げていて、右上のボタンが帯に被っていた。 */
-  body.hasTopBar #count{top:calc(var(--topbar,0px) + 8px);}
-  body.hasTopBar #topRight{top:calc(var(--topbar,0px) + 10px);}
+
   #ver{font-size:11px;color:var(--sawn-dim);background:rgba(30,22,16,.8);
     border:1px solid var(--line);border-radius:8px;padding:6px 9px;letter-spacing:.05em;
     backdrop-filter:blur(6px);white-space:nowrap;font-family:inherit;}
@@ -120,9 +119,12 @@
   #guessVal{width:46px;text-align:right;font-size:12px;color:var(--sawn-dim);}
   #bar button.on{border-color:var(--paint);color:var(--paint);}
   #bar button.erasing{background:#7A1D12;border-color:#FF6B4A;color:#FFD9CF;}
-  #eraseBanner{position:fixed;left:0;right:0;top:0;padding:calc(6px + env(safe-area-inset-top)) 8px 6px;
+  /* 案内の帯は**写真の下**に出す。以前は画面の上に固定していたが、
+     「この範囲に決定」が指から遠く、写真の上の方も隠していた(2026-09-17に移動)。
+     下のバーのすぐ上に置く。位置は placePanels() が合わせる。 */
+  #eraseBanner{position:fixed;left:0;right:0;bottom:0;padding:8px;
     background:#7A1D12;color:#FFE3DA;font-size:12px;text-align:center;font-weight:600;letter-spacing:.04em;}
-  #roiBanner{position:fixed;left:0;right:0;top:0;padding:calc(10px + env(safe-area-inset-top)) 14px 12px;
+  #roiBanner{position:fixed;left:0;right:0;bottom:0;padding:10px 14px 12px;
     background:rgba(4,34,43,.96);color:#EAF7FB;backdrop-filter:blur(6px);}
   #roiMsg{font-size:13px;font-weight:700;text-align:center;line-height:1.5;}
   #roiCount{font-size:11.5px;color:#7FDCEF;text-align:center;margin-top:4px;font-variant-numeric:tabular-nums;}
@@ -291,6 +293,9 @@
 <div id="morePanel" class="hide">
   <div class="grab" aria-label="つまんで下げると閉じます"></div>
   <div class="row" style="gap:8px">
+    <button id="rotate" class="act ghost2"><i>🔄</i>横向きで見る</button>
+  </div>
+  <div class="row" style="gap:8px">
     <button id="fit" class="act ghost2"><i>⤢</i>全体を表示</button>
     <button id="look" class="act ghost2"><i>🎨</i>見た目</button>
   </div>
@@ -389,7 +394,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v43';
+const APP_VER='v44';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -419,7 +424,7 @@ function resize(){
   dpr=Math.min(window.devicePixelRatio||1,2);
   cv.width=Math.round(cv.clientWidth*dpr); cv.height=Math.round(cv.clientHeight*dpr);
   ctx.setTransform(dpr,0,0,dpr,0,0);
-  if(img) fitS=Math.min(cv.clientWidth/img.width, cv.clientHeight/img.height);
+  if(img) fitS=Math.min(cv.clientWidth/dispW(), cv.clientHeight/dispH());
   draw();
 }
 window.addEventListener('resize',()=>{ resize(); fitTopBar(); });
@@ -427,29 +432,52 @@ window.addEventListener('resize',()=>{ resize(); fitTopBar(); });
 function fitView(){
   if(!img) return;
   const w=cv.clientWidth, h=cv.clientHeight;
-  fitS=Math.min(w/img.width,h/img.height);
+  fitS=Math.min(w/dispW(),h/dispH());
   view.s=fitS;
-  view.x=(w-img.width*view.s)/2;
-  view.y=(h-img.height*view.s)/2;
+  view.x=(w-dispW()*view.s)/2;
+  view.y=(h-dispH()*view.s)/2;
   draw();
 }
 /* 写真が画面外へ飛んでいかないように位置を制限 */
 function clampView(){
   if(!img) return;
   const w=cv.clientWidth, h=cv.clientHeight;
-  const iw=img.width*view.s, ih=img.height*view.s;
+  const iw=dispW()*view.s, ih=dispH()*view.s;
   const mx=Math.min(70,iw*0.5), my=Math.min(70,ih*0.5);
   view.x=Math.min(w-mx, Math.max(mx-iw, view.x));
   view.y=Math.min(h-my, Math.max(my-ih, view.y));
 }
-function toScreen(p){return {x:p.x*view.s+view.x, y:p.y*view.s+view.y};}
-function toImage(x,y){return {x:(x-view.x)/view.s, y:(y-view.y)/view.s};}
+/* 横向き表示。端末を回せない時(画面の回転ロック中など)に、
+   **写真の描き方だけ**を90度回して、横長の写真を画面いっぱいに見せる。
+   写真そのものやAIに渡す向きは変えない(学習は正しい向きで行っているため)。 */
+let rot=0;                       // 0=そのまま / 1=右に90度
+function dispW(){ return rot ? img.height : img.width; }
+function dispH(){ return rot ? img.width  : img.height; }
+function toScreen(p){
+  return rot
+    ? {x:(img.height-p.y)*view.s+view.x, y:p.x*view.s+view.y}
+    : {x:p.x*view.s+view.x, y:p.y*view.s+view.y};
+}
+function toImage(x,y){
+  const u=(x-view.x)/view.s, v=(y-view.y)/view.s;
+  return rot ? {x:v, y:img.height-u} : {x:u, y:v};
+}
 
 function draw(){
   ctx.clearRect(0,0,cv.clientWidth,cv.clientHeight);
   if(!img) return;
   ctx.imageSmoothingQuality='high';
-  ctx.drawImage(img, view.x, view.y, img.width*view.s, img.height*view.s);
+  if(rot){
+    ctx.save();
+    ctx.translate(view.x, view.y);
+    ctx.rotate(Math.PI/2);
+    ctx.scale(view.s, view.s);
+    ctx.translate(0, -img.height);
+    ctx.drawImage(img, 0, 0);
+    ctx.restore();
+  }else{
+    ctx.drawImage(img, view.x, view.y, img.width*view.s, img.height*view.s);
+  }
   const R=markRadius(), tc=textOn(markColor);
   /* 番号は、印の中に収まる時だけ全部に振る。
      小さくて収まらない時は**10本ごと**だけにする。
@@ -472,12 +500,15 @@ function draw(){
     }
     if(numAll || (numTen && ten)){
       const fs = numAll ? Math.round(R*0.9) : 11;
+      ctx.save();
+      if(rot){ ctx.translate(p.x,p.y); ctx.rotate(Math.PI/2); ctx.translate(-p.x,-p.y); }
       ctx.font=`700 ${fs}px Roboto, sans-serif`;
       ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.lineWidth=Math.max(2,fs*0.25);
       ctx.strokeStyle=tc==='#000000'?'rgba(255,255,255,.75)':'rgba(0,0,0,.7)';
       ctx.strokeText(i+1,p.x,p.y+1);
       ctx.fillStyle=tc; ctx.fillText(i+1,p.x,p.y+1);
+      ctx.restore();
     }
   });
   // 打った点をつないで輪郭を描く（描いている途中）
@@ -715,6 +746,7 @@ async function load(file){
     if(curURL) URL.revokeObjectURL(curURL);
     img=bmp; curURL=url;
     marks=[]; view={s:1,x:0,y:0}; resetTally(); beforeFit=null; updateCount();
+    // 横向きの指定はそのまま引き継ぐ（同じ現場で続けて撮るため）
     gdata=null; roi=null; lastRoi=null; roiMode=false; roiDraft=[]; guide=false;
     document.getElementById('roiGo').classList.add('hide');
     document.getElementById('roiAll').classList.add('hide');
@@ -808,6 +840,38 @@ function dropFitBack(){
   beforeFit=null;
   document.getElementById('fit').innerHTML='<i>⤢</i>全体を表示';
 }
+/* 横向きで見る。
+   まず端末そのものを横に固定できるか試す(Androidのブラウザは全画面なら効く)。
+   それが使えない端末(iPhoneなど)や、画面の回転ロックが入っている時は、
+   **写真の描き方だけ**を90度回す。端末を傾ければ画面いっぱいに見える。 */
+const rotBtn=document.getElementById('rotate');
+function labelRot(){
+  rotBtn.innerHTML = rot ? '<i>🔄</i>縦向きに戻す' : '<i>🔄</i>横向きで見る';
+}
+function turnCanvas(on){
+  rot = on ? 1 : 0;
+  resize(); fitView(); labelRot(); draw();
+}
+rotBtn.onclick=async()=>{
+  closeMore();
+  if(rot){ turnCanvas(false); flash('縦向きに戻しました', 2500); return; }
+  // ① 端末ごと横にできるなら、そちらが一番きれい（文字もボタンも一緒に回る）
+  try{
+    if(screen.orientation && screen.orientation.lock){
+      if(!document.fullscreenElement && document.documentElement.requestFullscreen){
+        await document.documentElement.requestFullscreen();
+      }
+      await screen.orientation.lock('landscape');
+      flash('横向きにしました。戻すには画面を下から上へスワイプして全画面を終了', 5000);
+      return;
+    }
+  }catch(e){ /* 使えない端末はここに来る。②へ */ }
+  // ② 端末を回せない時は、写真の描き方だけを回す
+  turnCanvas(true);
+  flash('写真を横向きにしました。<b>端末を横に傾けて</b>ご覧ください', 6000);
+};
+labelRot();
+
 document.getElementById('fit').onclick=()=>{
   const fitBtn=document.getElementById('fit');
   if(beforeFit){
@@ -1178,19 +1242,21 @@ const SENS=4;   // 感度は固定（利用者に選ばせない）
 /* 上に出ている帯の高さを測って、上に置いてあるものを下げる。
    帯は中身で高さが変わる（範囲指定の帯は説明文の分だけ背が高い）ので、
    固定値ではなく実測に合わせる。 */
+/* 案内の帯を、下のバーのすぐ上に置く。
+   以前は画面の上に固定し、本数バッジを押し下げていた。 */
 function fitTopBar(){
-  const bars=['eraseBanner','roiBanner']
-    .map(id=>document.getElementById(id))
-    .filter(el=>el && !el.classList.contains('hide'));
-  const h=bars.reduce((m,el)=>Math.max(m, el.getBoundingClientRect().bottom), 0);
-  document.body.classList.toggle('hasTopBar', h>0);
-  document.documentElement.style.setProperty('--topbar', Math.round(h)+'px');
+  const b=bar.offsetHeight+8;
+  for(const id of ['eraseBanner','roiBanner']){
+    const el=document.getElementById(id);
+    if(el) el.style.bottom=b+'px';
+  }
 }
 
 function placePanels(){
   const b=bar.offsetHeight+8;
   autoPanel.style.bottom=b+'px'; panel.style.bottom=b+'px'; hint.style.bottom=(b+6)+'px';
   calcPanel.style.bottom=b+'px'; roiGo.style.bottom=b+'px'; morePanel.style.bottom=b+'px';
+  fitTopBar();
   /* 画面の低い端末だと、パネルが本数バッジや右上のボタンに被る。
      上に置いてあるものの下から、下のバーまでの高さに収める。 */
   const topEnd=Math.max(
@@ -1369,6 +1435,7 @@ function endRoi(backToPanel=true){
 const roiGo=document.getElementById('roiGo');
 function showRoiGo(on){
   roiGo.classList.toggle('hide', !on);
+  placePanels();
   if(on) placePanels();
 }
 document.getElementById('roiBtn').onclick=startRoi;
