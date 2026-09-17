@@ -25,14 +25,21 @@
   #stage{position:fixed;inset:0;}
   canvas{display:block;width:100%;height:100%;touch-action:none;}
 
+  #emptyBtns{display:flex;flex-direction:column;gap:10px;align-items:center;}
+  .big.ghost{background:transparent;color:var(--paint);border:2px solid var(--paint);}
   #count{
     position:fixed;top:calc(10px + env(safe-area-inset-top));left:12px;
     background:rgba(30,22,16,.82);border:1px solid var(--line);border-radius:14px;
-    padding:6px 14px 8px;display:flex;align-items:baseline;gap:8px;backdrop-filter:blur(6px);
+    padding:5px 12px 7px;display:grid;grid-template-columns:auto auto;
+    align-items:baseline;column-gap:6px;backdrop-filter:blur(6px);
   }
-  #count b{font-size:38px;line-height:1;font-weight:800;letter-spacing:-.02em;
+  #count b{font-size:32px;line-height:1;font-weight:800;letter-spacing:-.02em;
     font-variant-numeric:tabular-nums;color:var(--paint);transition:color .15s;}
   #count span{font-size:13px;color:var(--sawn-dim);letter-spacing:.08em;}
+  /* AIが出した本数と、自分で直した数の内訳。荷渡しの時に根拠が分かるように */
+  /* 内訳は2段目。横に並べると右上のボタンにぶつかる */
+  #countBreak{grid-column:1 / -1;font-size:11px;letter-spacing:0;color:#9FD7A0;
+    margin-top:2px;white-space:nowrap;}
   /* 右上：電卓ボタンと版の表示を並べる */
   /* 最初の画面(#empty)が全画面に出るので、その上に重ねて押せるようにする */
   #topRight{position:fixed;top:calc(12px + env(safe-area-inset-top));right:12px;
@@ -80,11 +87,16 @@
   #bar{position:fixed;left:0;right:0;bottom:0;display:flex;flex-wrap:wrap;gap:6px;
     padding:8px 8px calc(8px + env(safe-area-inset-bottom));
     background:linear-gradient(to top,rgba(30,22,16,.96),rgba(30,22,16,.6));}
-  #bar button{flex:1 1 21%;background:var(--bark-2);color:var(--sawn);border:1px solid var(--line);
+  /* 6個を必ず1段に収める。2段になると写真の見える高さが半分近く減る */
+  #bar button{flex:1 1 0;min-width:48px;background:var(--bark-2);color:var(--sawn);border:1px solid var(--line);
     border-radius:12px;padding:9px 2px 8px;font-size:11px;line-height:1.3;font-weight:600;}
   #bar button:active{background:#3A2C1F;}
   #bar button i{display:block;font-size:18px;font-style:normal;margin-bottom:1px;}
 
+  #morePanel{position:fixed;left:8px;right:8px;bottom:150px;
+    background:rgba(38,30,22,.97);border:1px solid var(--line);border-radius:16px;
+    padding:8px 16px 16px;backdrop-filter:blur(8px);overflow-y:auto;}
+  #morePanel .act i{font-style:normal;margin-right:6px;}
   #savePanel{position:fixed;left:8px;right:8px;bottom:150px;
     background:rgba(38,30,22,.97);border:1px solid var(--line);border-radius:16px;
     padding:14px 16px 16px;backdrop-filter:blur(8px);}
@@ -208,7 +220,7 @@
 
 <div id="stage"><canvas id="cv"></canvas></div>
 
-<div id="count" class="hide"><b id="num">0</b><span>本</span></div>
+<div id="count" class="hide"><b id="num">0</b><span>本</span><span id="countBreak" class="hide"></span></div>
 
 <div id="topRight">
   <button id="camBtn" aria-label="写真を撮って数える">
@@ -232,8 +244,13 @@
 
 <div id="empty">
   <h1>原木カウンター</h1>
-  <p>写真を選んで、木口を指でタップ。<br>タップした数がそのまま本数になります。</p>
-  <button class="big" id="pickBig">写真を選ぶ</button>
+  <p><b>AIが木口を見つけて数えます。</b><br>
+     写真を選んだら「自動」→「数える」。<br>
+     抜けや余分は指でタップして直せます。</p>
+  <div id="emptyBtns">
+    <button class="big" id="shootBig">写真を撮る</button>
+    <button class="big ghost" id="pickBig">写真を選ぶ</button>
+  </div>
 </div>
 
 <div id="hint" class="hide">2本指で拡大・移動／消すときは「消す」をオンに</div>
@@ -246,7 +263,7 @@
   </div>
   <div class="row">
     <span class="lab">大きさ</span>
-    <input type="range" id="size" min="4" max="18" step="1" value="11">
+    <input type="range" id="size" min="5" max="16" step="1" value="10">
     <span id="preview"></span>
   </div>
   <div class="row">
@@ -259,15 +276,27 @@
   </div>
 </div>
 
+<!-- 下のバー。よく使う5つだけを1段に出す。
+     以前は8個を2段に並べていて、横持ちにすると画面の36%を占めていた。
+     残りの3つは「⋯」で下から出す(2026-09-17)。 -->
 <div id="bar" class="hide">
   <button id="pick"><i>🖼</i>写真</button>
   <button id="auto"><i>🤖</i>自動</button>
   <button id="undo"><i>↩</i>戻す</button>
   <button id="erase"><i>🧽</i>消す</button>
-  <button id="fit"><i>⤢</i>全体</button>
-  <button id="look"><i>🎨</i>見た目</button>
   <button id="save"><i>⬇</i>保存</button>
-  <button id="clear"><i>✕</i>全消去</button>
+  <button id="more"><i>⋯</i>その他</button>
+</div>
+
+<div id="morePanel" class="hide">
+  <div class="grab" aria-label="つまんで下げると閉じます"></div>
+  <div class="row" style="gap:8px">
+    <button id="fit" class="act ghost2"><i>⤢</i>全体を表示</button>
+    <button id="look" class="act ghost2"><i>🎨</i>見た目</button>
+  </div>
+  <div class="row" style="gap:8px">
+    <button id="clear" class="act ghost2"><i>✕</i>印を全部消す</button>
+  </div>
 </div>
 
 <div id="autoPanel" class="hide">
@@ -360,7 +389,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v42';
+const APP_VER='v43';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -371,7 +400,7 @@ const hint=document.getElementById('hint'), panel=document.getElementById('panel
 const busy=document.getElementById('busy');
 
 let img=null, curURL=null, marks=[], view={s:1,x:0,y:0};
-let showNums=true, markR=11, markColor='#FF5A1F', dpr=1;
+let showNums=true, markScale=1.0, markColor='#FF5A1F', dpr=1;
 let fitS=1, soundOn=true, ac=null, eraseMode=false;
 
 const COLORS=['#FF5A1F','#FF2D95','#FFD400','#7CFF3B','#00C6FF','#FFFFFF'];
@@ -421,19 +450,32 @@ function draw(){
   if(!img) return;
   ctx.imageSmoothingQuality='high';
   ctx.drawImage(img, view.x, view.y, img.width*view.s, img.height*view.s);
-  const R=markR, tc=textOn(markColor);
+  const R=markRadius(), tc=textOn(markColor);
+  /* 番号は、印の中に収まる時だけ全部に振る。
+     小さくて収まらない時は**10本ごと**だけにする。
+     全部に振ると数字が重なって読めなくなるが、10本ごとなら区切りが分かり、
+     目で追って確かめられる。 */
+  const numAll = showNums && R>=9;
+  const numTen = showNums && !numAll && R>=4;
   marks.forEach((m,i)=>{
     const p=toScreen(m);
     if(p.x<-R||p.y<-R||p.x>cv.clientWidth+R||p.y>cv.clientHeight+R) return;
+    const ten = (i+1)%10===0;
     ctx.beginPath(); ctx.arc(p.x,p.y,R,0,7);
     ctx.fillStyle=rgba(markColor,.42); ctx.fill();
-    ctx.lineWidth=Math.max(2,R*0.2); ctx.strokeStyle=markColor; ctx.stroke();
+    ctx.lineWidth=Math.max(1.5,R*0.2); ctx.strokeStyle=markColor; ctx.stroke();
     ctx.beginPath(); ctx.arc(p.x,p.y,R,0,7); ctx.lineWidth=1; ctx.strokeStyle='rgba(0,0,0,.45)'; ctx.stroke();
-    if(showNums&&R>=10){
-      ctx.font=`700 ${Math.round(R*0.9)}px Roboto, sans-serif`;
+    if(numTen && ten){
+      // 10本ごとの区切り。印の外側に白い輪を足して、数字は読める大きさで出す
+      ctx.beginPath(); ctx.arc(p.x,p.y,R+2.5,0,7);
+      ctx.lineWidth=2; ctx.strokeStyle='rgba(255,255,255,.9)'; ctx.stroke();
+    }
+    if(numAll || (numTen && ten)){
+      const fs = numAll ? Math.round(R*0.9) : 11;
+      ctx.font=`700 ${fs}px Roboto, sans-serif`;
       ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.lineWidth=Math.max(2,R*0.22);
-      ctx.strokeStyle=tc==='#000000'?'rgba(255,255,255,.7)':'rgba(0,0,0,.65)';
+      ctx.lineWidth=Math.max(2,fs*0.25);
+      ctx.strokeStyle=tc==='#000000'?'rgba(255,255,255,.75)':'rgba(0,0,0,.7)';
       ctx.strokeText(i+1,p.x,p.y+1);
       ctx.fillStyle=tc; ctx.fillText(i+1,p.x,p.y+1);
     }
@@ -478,7 +520,57 @@ function draw(){
     ctx.fillStyle='#FFD400'; ctx.fillText('木口1本の大きさの目安', cx, cy-rr-10);
   }
 }
-function updateCount(){ numEl.textContent=marks.length; }
+/* 印の大きさは、写真に写っている木口の大きさに合わせる。
+
+   以前は画面の画素で固定(11px)していた。すると土場の山のように木口が小さく写る
+   写真では、印が木口の2倍以上になって重なり合い、**一つの塊にしか見えなくなる**。
+   128本の写真で実測したところ、木口9.1px に対して印22px(2.4倍)だった。
+   「AIが数えた目安です。必ずご自身の目で確かめてください」と出しているのに、
+   確かめられない状態だった(2026-09-17に修正)。
+
+   木口の大きさは、隣り合う印の距離から測る(密に並ぶので、最近傍距離≒木口の直径)。 */
+/* AIが何本出して、自分で何本足した/消したかを残す。
+   荷渡しの場で「この数字は信用できるか」を判断する材料になる(2026-09-17)。 */
+let aiCount=null, addCount=0, delCount=0;
+function resetTally(){ aiCount=null; addCount=0; delCount=0; }
+
+let logSpan=0;            // 木口の間隔(元画像の画素)。測れない時は0
+function measureSpan(){
+  const n=marks.length;
+  if(n<3){ logSpan=0; return; }
+  // 数が多い時は間引いて測る(全部見ると重い)
+  const step=Math.max(1,Math.floor(n/120));
+  const a=[]; for(let i=0;i<n;i+=step) a.push(marks[i]);
+  const d=[];
+  for(let i=0;i<a.length;i++){
+    let best=Infinity;
+    for(let j=0;j<marks.length;j++){
+      if(marks[j]===a[i]) continue;
+      const q=Math.hypot(a[i].x-marks[j].x, a[i].y-marks[j].y);
+      if(q<best) best=q;
+    }
+    if(isFinite(best)) d.push(best);
+  }
+  if(!d.length){ logSpan=0; return; }
+  d.sort((x,y)=>x-y);
+  logSpan=d[d.length>>1];
+}
+/* 画面に描く時の印の半径。木口に合わせ、「大きさ」の調整を掛ける。 */
+function markRadius(){
+  const base = logSpan>0 ? logSpan*view.s*0.45 : 11;
+  return Math.max(3, Math.min(40, base*markScale));
+}
+function updateCount(){
+  numEl.textContent=marks.length;
+  const el=document.getElementById('countBreak');
+  if(aiCount===null || (!addCount && !delCount)){
+    el.classList.add('hide');
+  }else{
+    el.textContent = `AI ${aiCount}` + (addCount?` +${addCount}`:'') + (delCount?` −${delCount}`:'');
+    el.classList.remove('hide');
+  }
+  measureSpan();
+}
 
 /* ---- タップ・ピンチ操作 ---- */
 const pts=new Map();
@@ -501,7 +593,8 @@ cv.addEventListener('pointermove',e=>{
   if(pts.size===1){
     const dx=e.clientX-prev.x, dy=e.clientY-prev.y;
     if(Math.hypot(e.clientX-start.x,e.clientY-start.y)>10) moved=true;
-    if(moved){ view.x+=dx; view.y+=dy; clampView(); draw(); }
+    if(moved){ view.x+=dx; view.y+=dy; clampView(); dropFitBack(); draw(); }
+    dropFitBack();
   }else if(pts.size===2&&pinch){
     const [a,b]=[...pts.values()];
     const d=Math.hypot(a.x-b.x,a.y-b.y), cx=(a.x+b.x)/2, cy=(a.y+b.y)/2;
@@ -539,14 +632,14 @@ function tap(x,y){
     return;
   }
   if(eraseMode){
-    const hit=Math.max(markR+10,24);
+    const hit=Math.max(markRadius()+10,24);
     for(let i=marks.length-1;i>=0;i--){
       const p=toScreen(marks[i]);
-      if(Math.hypot(p.x-sx,p.y-sy)<hit){ marks.splice(i,1); updateCount(); draw(); vib(30); beep('del'); return; }
+      if(Math.hypot(p.x-sx,p.y-sy)<hit){ marks.splice(i,1); delCount++; updateCount(); draw(); vib(30); beep('del'); return; }
     }
     return; // 印のない所をタップしても何も起きない
   }
-  marks.push(toImage(sx,sy)); updateCount(); draw();
+  marks.push(toImage(sx,sy)); addCount++; updateCount(); draw();
   // 10本ごとは振動でも区切りが分かるようにする（音が使えない現場向け）
   const ten = marks.length%10===0;
   vib(ten ? [18,60,18] : 12);
@@ -621,7 +714,7 @@ async function load(file){
     if(img&&img.close) img.close();
     if(curURL) URL.revokeObjectURL(curURL);
     img=bmp; curURL=url;
-    marks=[]; view={s:1,x:0,y:0}; updateCount();
+    marks=[]; view={s:1,x:0,y:0}; resetTally(); beforeFit=null; updateCount();
     gdata=null; roi=null; lastRoi=null; roiMode=false; roiDraft=[]; guide=false;
     document.getElementById('roiGo').classList.add('hide');
     document.getElementById('roiAll').classList.add('hide');
@@ -634,7 +727,7 @@ async function load(file){
     emptyBox.classList.add('hide');
     bar.classList.remove('hide');
     countBox.classList.remove('hide');
-    flash('2本指で拡大・移動／消すときは「消す」をオンに', 4000);
+    flash(wideHint() || '2本指で拡大・移動／消すときは「消す」をオンに', wideHint()?6000:4000);
     resize(); fitView(); placePanels();
     loadAI().then(ok=>{
       const v=document.getElementById('ver');
@@ -679,11 +772,13 @@ document.getElementById('pick').onclick=pickPhoto;
 document.getElementById('pickBig').onclick=pickPhoto;
 /* カメラ。撮った写真は読み込むと同時に手元へ保存する。
    数えるのは今まで通り「自動」→「数える」を押してから。 */
-document.getElementById('camBtn').onclick=()=>{
+function shootPhoto(){
   fromCamera=true;
   fileInput.setAttribute('capture','environment');   // 外側のカメラを開く
   fileInput.click();
-};
+}
+document.getElementById('camBtn').onclick=shootPhoto;
+document.getElementById('shootBig').onclick=shootPhoto;
 
 document.getElementById('undo').onclick=()=>{ marks.pop(); updateCount(); draw(); };
 const eraseBtn=document.getElementById('erase'), eraseBanner=document.getElementById('eraseBanner');
@@ -696,9 +791,36 @@ eraseBtn.onclick=()=>{
   fitTopBar();
   vib(15);
 };
-document.getElementById('fit').onclick=fitView;
+/* あまり使わない3つは「その他」にまとめた。
+   以前は下のバーに8個を2段で並べており、横持ちだと画面の36%を占めていた。 */
+const morePanel=document.getElementById('morePanel'), moreBtn=document.getElementById('more');
+function closeMore(){ morePanel.classList.add('hide'); moreBtn.classList.remove('on'); }
+moreBtn.onclick=()=>{
+  if(!morePanel.classList.contains('hide')){ closeMore(); return; }
+  closePanels();
+  morePanel.classList.remove('hide'); moreBtn.classList.add('on'); placePanels();
+};
+/* 「全体」は行き来できるようにする。確認中に全体を見て、また元の場所へ戻れる。
+   以前は押すたびに全体になり、拡大し直しだった。 */
+let beforeFit=null;
+function dropFitBack(){
+  if(!beforeFit) return;
+  beforeFit=null;
+  document.getElementById('fit').innerHTML='<i>⤢</i>全体を表示';
+}
+document.getElementById('fit').onclick=()=>{
+  const fitBtn=document.getElementById('fit');
+  if(beforeFit){
+    view={...beforeFit}; beforeFit=null;
+    fitBtn.innerHTML='<i>⤢</i>全体を表示';
+  }else{
+    beforeFit={...view}; fitView();
+    fitBtn.innerHTML='<i>↩</i>元の場所に戻る';
+  }
+  draw(); closeMore();
+};
 document.getElementById('clear').onclick=()=>{
-  if(marks.length&&confirm('印を全部消しますか？')){ marks=[]; updateCount(); draw(); }
+  if(marks.length&&confirm('印を全部消しますか？')){ marks=[]; resetTally(); updateCount(); draw(); closeMore(); }
 };
 
 /* ---- 見た目の設定を覚えておく ----
@@ -708,7 +830,7 @@ const PREF_KEY='genboku-pref';
 function savePref(){
   try{
     localStorage.setItem(PREF_KEY, JSON.stringify({
-      color:markColor, size:markR, nums:showNums, snd:soundOn
+      color:markColor, scale:markScale, nums:showNums, snd:soundOn
     }));
   }catch(e){}
 }
@@ -716,7 +838,8 @@ function loadPref(){
   let d={};
   try{ d=JSON.parse(localStorage.getItem(PREF_KEY)||'{}'); }catch(e){ return; }
   if(COLORS.includes(d.color)) markColor=d.color;
-  if(typeof d.size==='number' && d.size>=4 && d.size<=18) markR=d.size;
+  // 以前の版の size(画素そのもの)は読まない。いまは倍率で持つ
+  if(typeof d.scale==='number' && d.scale>=0.5 && d.scale<=1.6) markScale=d.scale;
   if(typeof d.nums==='boolean') showNums=d.nums;
   if(typeof d.snd==='boolean') soundOn=d.snd;
   // 以前の版で保存された d.conf は読まない（厳しさは0.25に固定したため）
@@ -726,7 +849,7 @@ function loadPref(){
 const lookBtn=document.getElementById('look');
 function closeLook(){ panel.classList.add('hide'); lookBtn.classList.remove('on'); }
 /* パネルは同じ場所に出るので、1枚だけ開くようにする */
-function closePanels(){ closeAuto(); closeSave(); closeCalc(); closeLook(); closeSet(); showRoiGo(false); }
+function closePanels(){ closeAuto(); closeSave(); closeCalc(); closeLook(); closeSet(); closeMore(); showRoiGo(false); }
 lookBtn.onclick=()=>{
   if(!panel.classList.contains('hide')){ closeLook(); return; }
   closePanels();
@@ -746,11 +869,11 @@ COLORS.forEach(c=>{
 });
 const sizeInput=document.getElementById('size'), preview=document.getElementById('preview');
 function drawPreview(){
-  const d=Math.round(markR*1.6);
+  const d=Math.round(18*markScale);   // 見本。実際の大きさは木口に合わせて決まる
   preview.innerHTML=`<span style="display:block;width:${d}px;height:${d}px;border-radius:50%;
     background:${rgba(markColor,.42)};border:2px solid ${markColor}"></span>`;
 }
-sizeInput.addEventListener('input',()=>{ markR=+sizeInput.value; drawPreview(); draw(); });
+sizeInput.addEventListener('input',()=>{ markScale=+sizeInput.value/10; drawPreview(); draw(); });
 sizeInput.addEventListener('change',savePref);   // 動かし終わった時だけ保存する
 const togNum=document.getElementById('togNum');
 togNum.onclick=()=>{
@@ -1067,14 +1190,14 @@ function fitTopBar(){
 function placePanels(){
   const b=bar.offsetHeight+8;
   autoPanel.style.bottom=b+'px'; panel.style.bottom=b+'px'; hint.style.bottom=(b+6)+'px';
-  calcPanel.style.bottom=b+'px'; roiGo.style.bottom=b+'px';
+  calcPanel.style.bottom=b+'px'; roiGo.style.bottom=b+'px'; morePanel.style.bottom=b+'px';
   /* 画面の低い端末だと、パネルが本数バッジや右上のボタンに被る。
      上に置いてあるものの下から、下のバーまでの高さに収める。 */
   const topEnd=Math.max(
     document.getElementById('topRight').getBoundingClientRect().bottom,
     countBox.getBoundingClientRect().bottom) + 8;
   const room=Math.max(220, window.innerHeight - b - topEnd);
-  for(const el of [calcPanel, autoPanel, savePanel, panel, setPanel]) el.style.maxHeight=room+'px';
+  for(const el of [calcPanel, autoPanel, savePanel, panel, setPanel, morePanel]) el.style.maxHeight=room+'px';
   setPanel.style.bottom=b+'px';
 }
 guess.addEventListener('input',()=>{ guessVal.textContent=guess.value+'本'; });
@@ -1129,6 +1252,18 @@ function searchDetect(n){
 
 /* 画面下に少しの間だけ出る知らせ。写真の邪魔をしないよう自動で消える */
 let flashTimer=null;
+/* 横長の写真をスマホの縦持ちで開くと、写真は画面の3分の1しか使えず、
+   残り半分が真っ黒になる(実測: 812pxの画面で写真281px、空き395px)。
+   横向きにすると写真が画面いっぱいになり、木口も3割大きく見える。
+   土場の山は横長で撮るので、その時だけ一度知らせる。 */
+function wideHint(){
+  if(!img) return '';
+  const 写真が横長 = img.width > img.height*1.15;
+  const 画面が縦長 = innerHeight > innerWidth;
+  return (写真が横長 && 画面が縦長)
+    ? 'スマホを<b>横向き</b>にすると、写真が大きく見えて確かめやすくなります' : '';
+}
+
 function flash(msg, ms=5000, caution){
   hint.innerHTML = caution
     ? '<span class="multi">'+msg+'<i>'+caution+'</i></span>'
@@ -1160,7 +1295,7 @@ async function runAuto(){
     // 上の段から左→右の順に番号がつくよう並べ替え
     const rowH=img.height*0.05;
     pts.sort((a,b)=> Math.abs(a.y-b.y)>rowH ? a.y-b.y : a.x-b.x);
-    marks=pts;
+    marks=pts; aiCount=pts.length; addCount=0; delCount=0;
     guide=false; updateCount();
     lastRoi=roi;   // 学習データ用に、どこを囲って数えたかを覚えておく
     roi=null; document.getElementById('roiAll').classList.add('hide'); showRoiGo(false);
@@ -1277,8 +1412,12 @@ saveBtn.onclick=()=>{
   if(!img) return;
   if(!savePanel.classList.contains('hide')){ closeSave(); return; }
   closePanels();
+  const uchiwake = (aiCount!==null && (addCount||delCount))
+    ? `<br><span style="color:#9FD7A0">AIが ${aiCount}本 → ご自身で`
+      + (addCount?` ${addCount}本追加`:'') + (delCount?` ${delCount}本削除`:'') + `</span>`
+    : '';
   document.getElementById('saveMsg').innerHTML=
-    `現在 <b style="color:var(--paint)">${marks.length}本</b>。画像は印つきのPNG、学習データは写真とタップ位置をまとめたファイルです。`;
+    `現在 <b style="color:var(--paint)">${marks.length}本</b>。画像は印つきのPNG、学習データは写真とタップ位置をまとめたファイルです。${uchiwake}`;
   savePanel.classList.remove('hide'); saveBtn.classList.add('on'); placePanels();
 };
 document.getElementById('savePng').onclick=()=>{
@@ -1290,7 +1429,8 @@ document.getElementById('savePng').onclick=()=>{
   c.width=img.width; c.height=img.height;
   const g=c.getContext('2d');
   g.drawImage(img,0,0);
-  const r=Math.max(8,Math.max(img.width,img.height)*0.012*(markR/15));
+  // 画面と同じ見え方で焼き込む(木口に合わせた大きさ)
+  const r=Math.max(4, (logSpan>0 ? logSpan*0.45 : Math.max(img.width,img.height)*0.008)*markScale);
   const tc=textOn(markColor);
   marks.forEach((m,i)=>{
     g.beginPath(); g.arc(m.x,m.y,r,0,7);
@@ -1674,6 +1814,7 @@ bindGrab(savePanel, closeSave);
 bindGrab(panel, closeLook);
 bindGrab(calcPanel, closeCalc);
 bindGrab(setPanel, closeSet);
+bindGrab(morePanel, closeMore);
 
 /* 前回の見た目を読み込んで、画面に反映する。
    ボタンや入力欄を作り終えた後でないと反映できないので、ここで行う。 */
@@ -1682,7 +1823,7 @@ loadPref();
   [...swWrap.children].forEach(b=>
     b.setAttribute('aria-pressed', b.style.background===markColor || rgbToHex(b.style.background)===markColor));
   numEl.style.color=markColor;
-  sizeInput.value=markR; drawPreview();
+  sizeInput.value=Math.round(markScale*10); drawPreview();
   togNum.classList.toggle('on',showNums);
   togNum.textContent=showNums?'番号を表示する':'番号を表示しない';
   togSnd.classList.toggle('on',soundOn);
