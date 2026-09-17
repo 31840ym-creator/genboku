@@ -27,6 +27,36 @@
      写真・ボタン・パネル・帯が**全部いっしょに回る**。
      大きさと回す量は JS が実寸で入れる(端末のURLバーで 100vh がずれるため)。 */
   #app{position:fixed;top:0;left:0;width:100%;height:100%;transform-origin:0 0;}
+
+  /* ---- 背の低い画面(横向き)では、パネルを「消すモード」の帯くらい薄くする ----
+     横向きだと高さが375px程度しかないのに、案内のパネルが170px以上あって
+     写真がほとんど見えなかった(2026-09-17)。
+     文字を1行に詰め、ボタンを横に並べ、余白を削る。 */
+  body.short #autoPanel, body.short #savePanel, body.short #morePanel,
+  body.short #panel, body.short #setPanel{padding:8px 12px 10px;border-radius:14px;}
+  body.short #autoPanel .grab, body.short #savePanel .grab, body.short #morePanel .grab,
+  body.short #panel .grab, body.short #setPanel .grab{margin-bottom:4px;}
+  /* 案内文とボタンを1行にまとめる */
+  body.short #autoPanel{display:flex;align-items:center;gap:10px;}
+  body.short #autoPanel .grab{position:absolute;left:50%;transform:translateX(-50%);top:4px;margin:0;}
+  body.short #autoMsg{margin:0;flex:1;font-size:12px;line-height:1.35;}
+  body.short #autoPanel .row{margin:0;flex:0 0 auto;width:auto;}
+  body.short #autoPanel .row+.row{margin:0;}
+  body.short #autoPanel #redo{padding:10px 26px;font-size:14px;}
+  body.short #autoPanel #roiBtn, body.short #autoPanel #roiAll{padding:9px 14px;font-size:12px;}
+  body.short #guessRow{flex:1 1 auto;min-width:180px;}
+  /* 保存・その他・見た目・設定も詰める */
+  body.short #saveMsg, body.short #saveCaution{font-size:11px;margin-bottom:6px;line-height:1.4;}
+  body.short .row+.row{margin-top:8px;}
+  body.short .act{padding:9px 4px;font-size:12px;}
+
+  /* 範囲を囲う時の帯。横向きでは1行にまとめる */
+  body.short #roiBanner{padding:6px 10px 8px;display:flex;align-items:center;gap:10px;}
+  body.short #roiMsg{font-size:11.5px;text-align:left;flex:1;line-height:1.35;}
+  body.short #roiCount{margin:0;flex:0 0 auto;font-size:11px;}
+  body.short #roiBanner .row{margin:0;flex:0 0 auto;}
+  body.short #roiBanner .act{padding:9px 14px;font-size:12px;}
+  body.short #roiBanner .act.ghost{flex:0 0 auto;}
   #stage{position:fixed;inset:0;}
   canvas{display:block;width:100%;height:100%;touch-action:none;}
 
@@ -405,7 +435,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v45';
+const APP_VER='v46';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -438,12 +468,40 @@ function resize(){
   if(img) fitS=Math.min(cv.clientWidth/img.width, cv.clientHeight/img.height);
   draw();
 }
+/* 画面の大きさや向きが変わった時。
+
+   ここで**写真を置き直さないと、縦の時の拡大率と位置のまま残る**。
+   端末を横にしたのに写真が小さいまま隅に寄っている、という状態になっていた
+   (2026-09-17に修正)。
+
+   ・全体表示で見ていた → そのまま全体表示にし直す
+   ・拡大して見ていた   → 見ていた場所を画面の真ん中に保ったまま、はみ出しを直す */
+function refitAfterResize(){
+  if(!img) return;
+  const wasFit = Math.abs(view.s - fitS) < fitS*0.02;   // 全体表示で見ていたか
+  const mid = toImage(cv.clientWidth/2, cv.clientHeight/2);   // 画面の真ん中に写っていた場所
+  resize();                                            // ここで fitS が新しくなる
+  if(wasFit || view.s < fitS){
+    fitView();
+  }else{
+    view.x = cv.clientWidth/2  - mid.x*view.s;
+    view.y = cv.clientHeight/2 - mid.y*view.s;
+    clampView(); draw();
+  }
+}
 window.addEventListener('resize',()=>{
   // 端末が本当に横になったら、こちらで回すのはやめる（二重に回ってしまうため）
   if(land && innerWidth > innerHeight){ setLand(false); return; }
   if(land) applyLand();
-  resize(); fitTopBar(); placePanels();
+  shortScreen();
+  refitAfterResize();
+  fitTopBar(); placePanels(); labelRot();
 });
+/* 横向きのように**背の低い画面**では、パネルを薄くする(下のCSS body.short) */
+function shortScreen(){
+  const h = land ? innerWidth : innerHeight;
+  document.body.classList.toggle('short', h < 520);
+}
 
 function fitView(){
   if(!img) return;
@@ -846,6 +904,16 @@ const appEl=document.getElementById('app'), rotBtn=document.getElementById('rota
 const backBtn=document.getElementById('backPortrait');
 let land=false;                                  // 横向きで見ているか
 
+/* いま横向きで見えているか。
+   端末そのものが横になっている場合と、こちらで回している場合の両方を含む。 */
+function isLand(){ return land || innerWidth > innerHeight; }
+/* ボタンの文字は**いまの向き**で決める。
+   端末が横になっている時に「横向きで見る」と出ていて、切り替えられなかった。 */
+function labelRot(){
+  const L=isLand();
+  rotBtn.innerHTML = L ? '<i>🔄</i>縦向きにする' : '<i>🔄</i>横向きにする';
+  backBtn.classList.toggle('hide', !L);
+}
 function applyLand(){
   if(land){
     // 端末のURLバーで 100vh がずれるので、実寸を入れる
@@ -856,27 +924,36 @@ function applyLand(){
     appEl.style.width=''; appEl.style.height=''; appEl.style.transform='';
   }
   document.body.classList.toggle('landscape', land);
-  rotBtn.innerHTML = land ? '<i>🔄</i>縦向きに戻す' : '<i>🔄</i>横向きで見る';
-  backBtn.classList.toggle('hide', !land);
+  labelRot();
 }
 /* 指の位置を、回した後の画面の座標に直す。
    画面ぜんぶを回しているので、指の座標(clientX/Y)はそのままでは使えない。 */
 function appPt(e){
   return land ? {x:e.clientY, y:innerWidth-e.clientX} : {x:e.clientX, y:e.clientY};
 }
-function setLand(on, keepView){
+function setLand(on){
   if(land===on) return;
   land=on;
   applyLand();
   requestAnimationFrame(()=>{
-    resize(); placePanels();
-    if(!keepView) fitView();
-    draw();
+    shortScreen(); resize(); fitView(); placePanels();
   });
+}
+/* 縦に戻す。端末を横に固定していたらそれも解く。 */
+async function goPortrait(){
+  if(land) setLand(false);
+  try{ if(screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); }catch(e){}
+  try{
+    if(screen.orientation && screen.orientation.lock && innerWidth>innerHeight){
+      await screen.orientation.lock('portrait');
+    }
+  }catch(e){}
+  try{ if(document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen(); }catch(e){}
+  labelRot();
 }
 rotBtn.onclick=async()=>{
   closeMore();
-  if(land){ setLand(false); flash('縦向きに戻しました', 2500); return; }
+  if(isLand()){ await goPortrait(); flash('縦向きにしました', 2500); return; }
   // ① 端末ごと横にできるならそれが一番きれい（Androidのブラウザは全画面なら効く）
   try{
     if(screen.orientation && screen.orientation.lock){
@@ -895,12 +972,8 @@ rotBtn.onclick=async()=>{
   flash('<b>端末を横に傾けて</b>ご覧ください。戻すには右上の「縦」を押します', 6000);
 };
 /* 戻し方が分からないと困るので、横向きの間は常に「縦」ボタンを出しておく */
-backBtn.onclick=()=>{
-  if(document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(()=>{});
-  if(screen.orientation && screen.orientation.unlock) try{ screen.orientation.unlock(); }catch(e){}
-  setLand(false);
-};
-applyLand();
+backBtn.onclick=()=>{ goPortrait(); };
+applyLand(); shortScreen();
 
 document.getElementById('fit').onclick=()=>{
   const fitBtn=document.getElementById('fit');
