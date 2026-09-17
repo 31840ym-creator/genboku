@@ -22,6 +22,11 @@
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{margin:0;height:100%;overflow:hidden;background:var(--bark);color:var(--sawn);
     font-family:"Roboto","Noto Sans JP",system-ui,sans-serif;}
+  /* 画面ぜんぶを包む入れ物。横向きにする時はこれごと90度回す。
+     transform が掛かると、中の position:fixed はこの入れ物を基準に並ぶので、
+     写真・ボタン・パネル・帯が**全部いっしょに回る**。
+     大きさと回す量は JS が実寸で入れる(端末のURLバーで 100vh がずれるため)。 */
+  #app{position:fixed;top:0;left:0;width:100%;height:100%;transform-origin:0 0;}
   #stage{position:fixed;inset:0;}
   canvas{display:block;width:100%;height:100%;touch-action:none;}
 
@@ -50,6 +55,8 @@
   #calcBtn:active,#camBtn:active{background:#3A2C1F;}
   #calcBtn.on{border-color:var(--paint);color:var(--paint);background:#3A2C1F;}
   #camBtn{color:var(--paint);}
+  #backPortrait{background:var(--paint);color:var(--paint-ink);border:none;border-radius:12px;
+    padding:0 12px;height:44px;font-size:14px;font-weight:700;}
   /* 上に帯（「消す」「範囲を囲む」）が出ている間は、その分だけ下げる。
      帯の高さは中身で変わるので、--topbar をJS側から入れる。
      以前は本数バッジだけ固定値で下げていて、右上のボタンが帯に被っていた。 */
@@ -220,11 +227,14 @@
 </head>
 <body>
 
+<div id="app">
 <div id="stage"><canvas id="cv"></canvas></div>
 
 <div id="count" class="hide"><b id="num">0</b><span>本</span><span id="countBreak" class="hide"></span></div>
 
 <div id="topRight">
+  <!-- 横向きの間だけ出す。戻し方が分からなくならないよう常に見える場所に置く -->
+  <button id="backPortrait" class="hide" aria-label="縦向きに戻す">⟲縦</button>
   <button id="camBtn" aria-label="写真を撮って数える">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
       <path d="M3 8.5h3.2l1.5-2.4h8.6l1.5 2.4H21v11H3z" stroke-linecap="round"/>
@@ -390,11 +400,12 @@
 </div>
 <div id="busy" class="hide">写真を読み込み中…</div>
 <input type="file" id="file" accept="image/*">
+</div><!-- /#app -->
 
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v44';
+const APP_VER='v45';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -424,60 +435,42 @@ function resize(){
   dpr=Math.min(window.devicePixelRatio||1,2);
   cv.width=Math.round(cv.clientWidth*dpr); cv.height=Math.round(cv.clientHeight*dpr);
   ctx.setTransform(dpr,0,0,dpr,0,0);
-  if(img) fitS=Math.min(cv.clientWidth/dispW(), cv.clientHeight/dispH());
+  if(img) fitS=Math.min(cv.clientWidth/img.width, cv.clientHeight/img.height);
   draw();
 }
-window.addEventListener('resize',()=>{ resize(); fitTopBar(); });
+window.addEventListener('resize',()=>{
+  // 端末が本当に横になったら、こちらで回すのはやめる（二重に回ってしまうため）
+  if(land && innerWidth > innerHeight){ setLand(false); return; }
+  if(land) applyLand();
+  resize(); fitTopBar(); placePanels();
+});
 
 function fitView(){
   if(!img) return;
   const w=cv.clientWidth, h=cv.clientHeight;
-  fitS=Math.min(w/dispW(),h/dispH());
+  fitS=Math.min(w/img.width,h/img.height);
   view.s=fitS;
-  view.x=(w-dispW()*view.s)/2;
-  view.y=(h-dispH()*view.s)/2;
+  view.x=(w-img.width*view.s)/2;
+  view.y=(h-img.height*view.s)/2;
   draw();
 }
 /* 写真が画面外へ飛んでいかないように位置を制限 */
 function clampView(){
   if(!img) return;
   const w=cv.clientWidth, h=cv.clientHeight;
-  const iw=dispW()*view.s, ih=dispH()*view.s;
+  const iw=img.width*view.s, ih=img.height*view.s;
   const mx=Math.min(70,iw*0.5), my=Math.min(70,ih*0.5);
   view.x=Math.min(w-mx, Math.max(mx-iw, view.x));
   view.y=Math.min(h-my, Math.max(my-ih, view.y));
 }
-/* 横向き表示。端末を回せない時(画面の回転ロック中など)に、
-   **写真の描き方だけ**を90度回して、横長の写真を画面いっぱいに見せる。
-   写真そのものやAIに渡す向きは変えない(学習は正しい向きで行っているため)。 */
-let rot=0;                       // 0=そのまま / 1=右に90度
-function dispW(){ return rot ? img.height : img.width; }
-function dispH(){ return rot ? img.width  : img.height; }
-function toScreen(p){
-  return rot
-    ? {x:(img.height-p.y)*view.s+view.x, y:p.x*view.s+view.y}
-    : {x:p.x*view.s+view.x, y:p.y*view.s+view.y};
-}
-function toImage(x,y){
-  const u=(x-view.x)/view.s, v=(y-view.y)/view.s;
-  return rot ? {x:v, y:img.height-u} : {x:u, y:v};
-}
+function toScreen(p){return {x:p.x*view.s+view.x, y:p.y*view.s+view.y};}
+function toImage(x,y){return {x:(x-view.x)/view.s, y:(y-view.y)/view.s};}
 
 function draw(){
   ctx.clearRect(0,0,cv.clientWidth,cv.clientHeight);
   if(!img) return;
   ctx.imageSmoothingQuality='high';
-  if(rot){
-    ctx.save();
-    ctx.translate(view.x, view.y);
-    ctx.rotate(Math.PI/2);
-    ctx.scale(view.s, view.s);
-    ctx.translate(0, -img.height);
-    ctx.drawImage(img, 0, 0);
-    ctx.restore();
-  }else{
-    ctx.drawImage(img, view.x, view.y, img.width*view.s, img.height*view.s);
-  }
+  ctx.drawImage(img, view.x, view.y, img.width*view.s, img.height*view.s);
   const R=markRadius(), tc=textOn(markColor);
   /* 番号は、印の中に収まる時だけ全部に振る。
      小さくて収まらない時は**10本ごと**だけにする。
@@ -500,15 +493,12 @@ function draw(){
     }
     if(numAll || (numTen && ten)){
       const fs = numAll ? Math.round(R*0.9) : 11;
-      ctx.save();
-      if(rot){ ctx.translate(p.x,p.y); ctx.rotate(Math.PI/2); ctx.translate(-p.x,-p.y); }
       ctx.font=`700 ${fs}px Roboto, sans-serif`;
       ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.lineWidth=Math.max(2,fs*0.25);
       ctx.strokeStyle=tc==='#000000'?'rgba(255,255,255,.75)':'rgba(0,0,0,.7)';
       ctx.strokeText(i+1,p.x,p.y+1);
       ctx.fillStyle=tc; ctx.fillText(i+1,p.x,p.y+1);
-      ctx.restore();
     }
   });
   // 打った点をつないで輪郭を描く（描いている途中）
@@ -609,8 +599,9 @@ let start=null, moved=false, pinch=null;
 
 cv.addEventListener('pointerdown',e=>{
   cv.setPointerCapture(e.pointerId);
-  pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
-  if(pts.size===1){ start={x:e.clientX,y:e.clientY}; moved=false; }
+  const q=appPt(e);
+  pts.set(e.pointerId,{x:q.x,y:q.y});
+  if(pts.size===1){ start={x:q.x,y:q.y}; moved=false; }
   else if(pts.size===2){
     const [a,b]=[...pts.values()];
     pinch={d:Math.hypot(a.x-b.x,a.y-b.y), cx:(a.x+b.x)/2, cy:(a.y+b.y)/2};
@@ -620,10 +611,11 @@ cv.addEventListener('pointerdown',e=>{
 cv.addEventListener('pointermove',e=>{
   if(!pts.has(e.pointerId)||!img) return;
   const prev=pts.get(e.pointerId);
-  pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  const q=appPt(e);
+  pts.set(e.pointerId,{x:q.x,y:q.y});
   if(pts.size===1){
-    const dx=e.clientX-prev.x, dy=e.clientY-prev.y;
-    if(Math.hypot(e.clientX-start.x,e.clientY-start.y)>10) moved=true;
+    const dx=q.x-prev.x, dy=q.y-prev.y;
+    if(Math.hypot(q.x-start.x,q.y-start.y)>10) moved=true;
     if(moved){ view.x+=dx; view.y+=dy; clampView(); dropFitBack(); draw(); }
     dropFitBack();
   }else if(pts.size===2&&pinch){
@@ -643,7 +635,7 @@ function up(e){
   if(!pts.has(e.pointerId)) return;
   pts.delete(e.pointerId);
   if(pts.size===0){
-    if(!moved&&img) tap(e.clientX,e.clientY);
+    if(!moved&&img){ const q=appPt(e); tap(q.x,q.y); }
     pinch=null;
   }else if(pts.size===1){
     pinch=null; moved=true;
@@ -654,8 +646,9 @@ cv.addEventListener('pointerup',up);
 cv.addEventListener('pointercancel',up);
 
 function tap(x,y){
-  const r=cv.getBoundingClientRect();
-  const sx=x-r.left, sy=y-r.top;
+  // 回している時 getBoundingClientRect は画面基準の外枠を返すので使えない。
+  // 並びの位置(offsetLeft/Top)は回転の影響を受けないのでこちらを使う。
+  const sx=x-cv.offsetLeft, sy=y-cv.offsetTop;
   if(roiMode){
     roiDraft.push(toImage(sx,sy));
     updateRoiBanner();
@@ -840,37 +833,74 @@ function dropFitBack(){
   beforeFit=null;
   document.getElementById('fit').innerHTML='<i>⤢</i>全体を表示';
 }
-/* 横向きで見る。
-   まず端末そのものを横に固定できるか試す(Androidのブラウザは全画面なら効く)。
-   それが使えない端末(iPhoneなど)や、画面の回転ロックが入っている時は、
-   **写真の描き方だけ**を90度回す。端末を傾ければ画面いっぱいに見える。 */
-const rotBtn=document.getElementById('rotate');
-function labelRot(){
-  rotBtn.innerHTML = rot ? '<i>🔄</i>縦向きに戻す' : '<i>🔄</i>横向きで見る';
+/* ---- 横向きで見る ----
+
+   端末の回転ロックを掛けていると、傾けても画面は縦のまま。
+   そこで **画面ぜんぶ(#app)を90度回す**。写真だけでなくボタン・パネル・帯も
+   一緒に回るので、端末を傾ければそのまま横向きの道具として使える。
+
+   最初は写真だけ回していたが、ボタンや文字が縦のままで読みづらかった(2026-09-17に改めた)。
+
+   写真そのものやAIに渡す向きは変えない(学習は正しい向きで行っているため)。 */
+const appEl=document.getElementById('app'), rotBtn=document.getElementById('rotate');
+const backBtn=document.getElementById('backPortrait');
+let land=false;                                  // 横向きで見ているか
+
+function applyLand(){
+  if(land){
+    // 端末のURLバーで 100vh がずれるので、実寸を入れる
+    appEl.style.width=innerHeight+'px';
+    appEl.style.height=innerWidth+'px';
+    appEl.style.transform=`rotate(90deg) translateY(${-innerWidth}px)`;
+  }else{
+    appEl.style.width=''; appEl.style.height=''; appEl.style.transform='';
+  }
+  document.body.classList.toggle('landscape', land);
+  rotBtn.innerHTML = land ? '<i>🔄</i>縦向きに戻す' : '<i>🔄</i>横向きで見る';
+  backBtn.classList.toggle('hide', !land);
 }
-function turnCanvas(on){
-  rot = on ? 1 : 0;
-  resize(); fitView(); labelRot(); draw();
+/* 指の位置を、回した後の画面の座標に直す。
+   画面ぜんぶを回しているので、指の座標(clientX/Y)はそのままでは使えない。 */
+function appPt(e){
+  return land ? {x:e.clientY, y:innerWidth-e.clientX} : {x:e.clientX, y:e.clientY};
+}
+function setLand(on, keepView){
+  if(land===on) return;
+  land=on;
+  applyLand();
+  requestAnimationFrame(()=>{
+    resize(); placePanels();
+    if(!keepView) fitView();
+    draw();
+  });
 }
 rotBtn.onclick=async()=>{
   closeMore();
-  if(rot){ turnCanvas(false); flash('縦向きに戻しました', 2500); return; }
-  // ① 端末ごと横にできるなら、そちらが一番きれい（文字もボタンも一緒に回る）
+  if(land){ setLand(false); flash('縦向きに戻しました', 2500); return; }
+  // ① 端末ごと横にできるならそれが一番きれい（Androidのブラウザは全画面なら効く）
   try{
     if(screen.orientation && screen.orientation.lock){
       if(!document.fullscreenElement && document.documentElement.requestFullscreen){
         await document.documentElement.requestFullscreen();
       }
       await screen.orientation.lock('landscape');
-      flash('横向きにしました。戻すには画面を下から上へスワイプして全画面を終了', 5000);
+      flash('横向きにしました', 3000);
       return;
     }
   }catch(e){ /* 使えない端末はここに来る。②へ */ }
-  // ② 端末を回せない時は、写真の描き方だけを回す
-  turnCanvas(true);
-  flash('写真を横向きにしました。<b>端末を横に傾けて</b>ご覧ください', 6000);
+  // すでに画面が横長なら、回す必要がない（回すと縦に戻ってしまう）
+  if(innerWidth > innerHeight){ flash('すでに横向きです', 2500); return; }
+  // ② 端末を回せない時は、画面ぜんぶを回す
+  setLand(true);
+  flash('<b>端末を横に傾けて</b>ご覧ください。戻すには右上の「縦」を押します', 6000);
 };
-labelRot();
+/* 戻し方が分からないと困るので、横向きの間は常に「縦」ボタンを出しておく */
+backBtn.onclick=()=>{
+  if(document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(()=>{});
+  if(screen.orientation && screen.orientation.unlock) try{ screen.orientation.unlock(); }catch(e){}
+  setLand(false);
+};
+applyLand();
 
 document.getElementById('fit').onclick=()=>{
   const fitBtn=document.getElementById('fit');
@@ -1262,7 +1292,8 @@ function placePanels(){
   const topEnd=Math.max(
     document.getElementById('topRight').getBoundingClientRect().bottom,
     countBox.getBoundingClientRect().bottom) + 8;
-  const room=Math.max(220, window.innerHeight - b - topEnd);
+  // 横向きに回している時、使える高さは画面の「幅」の方
+  const room=Math.max(200, (land?innerWidth:innerHeight) - b - topEnd);
   for(const el of [calcPanel, autoPanel, savePanel, panel, setPanel, morePanel]) el.style.maxHeight=room+'px';
   setPanel.style.bottom=b+'px';
 }
@@ -1325,7 +1356,7 @@ let flashTimer=null;
 function wideHint(){
   if(!img) return '';
   const 写真が横長 = img.width > img.height*1.15;
-  const 画面が縦長 = innerHeight > innerWidth;
+  const 画面が縦長 = !land && innerHeight > innerWidth;
   return (写真が横長 && 画面が縦長)
     ? 'スマホを<b>横向き</b>にすると、写真が大きく見えて確かめやすくなります' : '';
 }
