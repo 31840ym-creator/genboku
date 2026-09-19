@@ -616,7 +616,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v68';
+const APP_VER='v69';
 document.getElementById('ver').textContent=APP_VER;
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -1617,10 +1617,12 @@ async function openAuto(){
     await loadAI();
   }
   document.getElementById('guessRow').classList.toggle('hide', aiReady);
-  autoMsg.innerHTML = aiReady
+  // 範囲を囲ったまま閉じて開き直した時に、囲っていることを忘れないよう出す
+  const roiNote = roi ? '<b style="color:#7FDCEF">範囲を指定しています。</b>' : '';
+  autoMsg.innerHTML = roiNote + (aiReady
     ? 'AIで数えます。「数える」を押してください。'
     : 'だいたいの本数を合わせて「数える」を押してください。'
-      + (aiError ? `<br><span style="color:#FF8A5C;font-size:10px;word-break:break-all;line-height:1.5">AIが使えません／${aiError}</span>` : '');
+      + (aiError ? `<br><span style="color:#FF8A5C;font-size:10px;word-break:break-all;line-height:1.5">AIが使えません／${aiError}</span>` : ''));
   placePanels();
 }
 
@@ -1703,14 +1705,21 @@ async function runAuto(){
   }
 }
 const autoBtn=document.getElementById('auto');
+/* 「自動」を閉じる時は、その中から開いた**範囲の帯と「この範囲で数える」も
+   一緒に畳む**。以前は自動のパネルだけ消えて、範囲の帯が写真の上に
+   残ってしまっていた(2026-09-20) */
 function closeAuto(){
   autoPanel.classList.add('hide');
   autoBtn.classList.remove('on');
+  if(roiMode) endRoi(false);
+  showRoiGo(false);
   guide=false; draw();
 }
-/* 「見た目」と同じで、もう一度押せば閉じる */
+/* 「見た目」と同じで、もう一度押せば閉じる。
+   範囲を囲っている間も「自動」は点いたままなので、
+   パネルが出ているかではなく**点いているか**で見る */
 autoBtn.onclick=()=>{
-  if(!autoPanel.classList.contains('hide')){ closeAuto(); return; }
+  if(autoBtn.classList.contains('on')){ closeAuto(); return; }
   closePanels();
   autoBtn.classList.add('on');
   openAuto();
