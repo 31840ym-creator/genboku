@@ -50,7 +50,10 @@
     left:8px;right:auto;width:auto;max-width:var(--panelmax,60%);}
   /* 帯も浮いた箱になるので角を丸める */
   body.short #roiBanner, body.short #eraseBanner{border-radius:13px;}
-  body.short #eraseBanner{padding:9px 14px;}
+  /* 消すモードは「いま触ると消える」という大事な合図なので、
+     横向きでも小さくしない。はっきり大きく出す(2026-09-20) */
+  body.short #eraseBanner{padding:13px 20px;font-size:18px;letter-spacing:.06em;
+    white-space:nowrap;border-radius:15px;box-shadow:0 3px 14px rgba(0,0,0,.45);}
 
   /* ---- 横向き(背の低い画面)のパネル ----
      高さが375px程度しかないので、パネルは**下のバーと同じくらいの薄さ**に収める。
@@ -94,10 +97,14 @@
   body.short #saveBtns{display:flex;gap:8px;}
   body.short #saveBtns .row{margin:0;flex:1;}
 
-  /* その他・設定：ボタンを1行に並べる */
-  body.short #morePanel .row{margin:0;}
-  body.short #morePanel{display:flex;gap:8px;flex-wrap:wrap;}
-  body.short #morePanel .row{flex:1 1 auto;}
+  /* その他：横向きはボタン4つを1列に、幅をきっちり揃える。
+     .row の入れ子のままだと行ごとに幅が決まり、
+     絵文字の分だけ「見た目」と「戻す」で太さが変わっていた(2026-09-20)。
+     並びではなく格子にしているのは、1fr の列は全部同じ幅になり、
+     しかも一番長い文字に合わせて広がってくれるため(折り返さない) */
+  body.short #morePanel{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:8px;}
+  body.short #morePanel .row{display:contents;}
+  body.short #morePanel .act{white-space:nowrap;}
   body.short #setPanel .setHead{margin-bottom:4px;font-size:12px;}
   body.short #setPanel #setReset{margin-top:6px;}
   body.short .setRow{padding:5px 0;font-size:12px;}
@@ -255,8 +262,11 @@
   #morePanel{position:fixed;left:8px;right:8px;bottom:150px;
     background:rgba(38,30,22,.97);border:1px solid var(--line);border-radius:16px;
     padding:8px 16px 16px;backdrop-filter:blur(8px);overflow-y:auto;overflow-x:hidden;}
-  #morePanel .act i{font-style:normal;margin-right:6px;display:inline-flex;
-    align-items:center;vertical-align:-3px;}
+  /* 記号は絵文字と描いた図形が混ざっている。そのままだと行の高さが
+     数pxずれて「見た目」と「戻す」で背が変わるので、枠を18pxに揃える */
+  #morePanel .act{display:flex;align-items:center;justify-content:center;gap:6px;}
+  #morePanel .act i{font-style:normal;display:inline-flex;align-items:center;
+    justify-content:center;height:18px;line-height:18px;}
   #morePanel .act i svg{width:17px;height:17px;display:block;}
   #savePanel{position:fixed;left:8px;right:8px;bottom:150px;
     background:rgba(38,30,22,.97);border:1px solid var(--line);border-radius:16px;
@@ -287,8 +297,8 @@
   /* 案内の帯は**写真の下**に出す。以前は画面の上に固定していたが、
      「この範囲に決定」が指から遠く、写真の上の方も隠していた(2026-09-17に移動)。
      下のバーのすぐ上に置く。位置は placePanels() が合わせる。 */
-  #eraseBanner{position:fixed;left:0;right:0;bottom:0;padding:8px;
-    background:#7A1D12;color:#FFE3DA;font-size:12px;text-align:center;font-weight:600;letter-spacing:.04em;}
+  #eraseBanner{position:fixed;left:0;right:0;bottom:0;padding:11px 8px;
+    background:#7A1D12;color:#FFE3DA;font-size:15px;text-align:center;font-weight:700;letter-spacing:.05em;}
   #roiBanner{position:fixed;left:0;right:0;bottom:0;padding:7px 14px 9px;
     background:rgba(4,34,43,.96);color:#EAF7FB;backdrop-filter:blur(6px);}
   #roiMsg{font-size:12px;font-weight:700;text-align:center;line-height:1.4;}
@@ -596,7 +606,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v66';
+const APP_VER='v67';
 document.getElementById('ver').textContent=APP_VER;
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
