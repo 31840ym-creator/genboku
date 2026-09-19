@@ -33,7 +33,7 @@
      写真がほとんど見えなかった(2026-09-17)。
      文字を1行に詰め、ボタンを横に並べ、余白を削る。 */
   body.short #autoPanel, body.short #savePanel, body.short #morePanel,
-  body.short #panel, body.short #setPanel, body.short #statusPanel{padding:8px 12px 10px;border-radius:14px;}
+  body.short #panel, body.short #setPanel, body.short #statusPanel{padding:8px 12px 10px;border-radius:14px;overflow-x:hidden;}
   body.short #autoPanel .grab, body.short #savePanel .grab, body.short #morePanel .grab,
   body.short #panel .grab, body.short #setPanel .grab, body.short #statusPanel .grab{margin-bottom:4px;}
   /* 案内文とボタンを1行にまとめる */
@@ -57,6 +57,29 @@
   body.short #roiBanner .row{margin:0;flex:0 0 auto;}
   body.short #roiBanner .act{padding:9px 14px;font-size:12px;}
   body.short #roiBanner .act.ghost{flex:0 0 auto;}
+
+  /* ---- 横向きの電卓 ----
+     高さが足りずキーが潰れて数字が切れていた(中身290px / 入る高さ242px)。
+     横長に広げる必要は無いので、**幅はそのまま**(420px・中央)にして
+     縦の詰まりだけを解く。文字と余白を小さくして5段が収まるようにする。 */
+  body.short #calcPanel{padding:6px 10px 8px;overflow-x:hidden;}
+  body.short #calcTop{gap:8px;}
+  body.short #calcHistBtn{padding:5px 10px;font-size:12px;}
+  body.short #calcExpr{font-size:19px;min-height:24px;}
+  body.short #calcDisp{font-size:14px;min-height:18px;margin:1px 0 6px;}
+  body.short #calcDisp.answer{font-size:28px;}
+  body.short #calcKeys{gap:5px;}
+  body.short .ck{padding:5px 2px;font-size:17px;border-radius:9px;}
+  body.short .ck.fn{font-size:14px;}
+  body.short #calcHist{max-height:120px;}
+  body.short #calcHist .hrow{padding:7px 10px;}
+  body.short #calcHist .hrow .hr{font-size:16px;}
+  body.short #calcHist .hrow .he{font-size:12px;}
+
+  /* 横向きの保存パネル。2つの保存ボタンを**横に並べて**薄くする。
+     確認の文言は消さない(記録に残す瞬間なので) */
+  body.short #saveBtns{display:flex;gap:8px;}
+  body.short #saveBtns .row{margin:0;flex:1;}
   #stage{position:fixed;inset:0;}
   canvas{display:block;width:100%;height:100%;touch-action:none;}
 
@@ -109,7 +132,7 @@
     padding:10px 16px 12px;backdrop-filter:blur(8px);overflow-y:auto;}
   #setPanel{position:fixed;left:8px;right:8px;bottom:150px;
     background:rgba(38,30,22,.97);border:1px solid var(--line);border-radius:16px;
-    padding:14px 16px 16px;backdrop-filter:blur(8px);overflow-y:auto;}
+    padding:14px 16px 16px;backdrop-filter:blur(8px);overflow-y:auto;overflow-x:hidden;}
   .setHead{font-size:13px;font-weight:700;color:var(--sawn);margin-bottom:10px;letter-spacing:.06em;}
   .setRow{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
     padding:9px 0;border-top:1px solid var(--line);font-size:12.5px;color:var(--sawn-dim);}
@@ -142,23 +165,24 @@
 
   #morePanel{position:fixed;left:8px;right:8px;bottom:150px;
     background:rgba(38,30,22,.97);border:1px solid var(--line);border-radius:16px;
-    padding:8px 16px 16px;backdrop-filter:blur(8px);overflow-y:auto;}
+    padding:8px 16px 16px;backdrop-filter:blur(8px);overflow-y:auto;overflow-x:hidden;}
   #morePanel .act i{font-style:normal;margin-right:6px;}
   #savePanel{position:fixed;left:8px;right:8px;bottom:150px;
     background:rgba(38,30,22,.97);border:1px solid var(--line);border-radius:16px;
     padding:14px 16px 16px;backdrop-filter:blur(8px);}
-  #savePanel,#autoPanel,#panel{overflow-y:auto;}
+  #savePanel,#autoPanel,#panel{overflow-y:auto;overflow-x:hidden;}
   #saveMsg{font-size:12px;line-height:1.6;color:var(--sawn-dim);margin-bottom:10px;}
   /* 保存は本数が記録に残る場面なので、ここでも確認をうながす */
   #saveCaution{font-size:11.5px;line-height:1.55;color:#E8A96B;
     border-top:1px solid var(--line);padding-top:9px;margin-bottom:12px;}
+  /* 案内の帯は薄く。写真が少しでも多く見えるように(2026-09-19) */
   #autoPanel{position:fixed;left:8px;right:8px;bottom:150px;
     background:rgba(38,30,22,.97);border:1px solid var(--line);border-radius:16px;
-    padding:14px 16px 16px;backdrop-filter:blur(8px);}
-  #autoMsg{font-size:13px;line-height:1.6;color:var(--sawn);margin-bottom:12px;}
+    padding:8px 14px 10px;backdrop-filter:blur(8px);}
+  #autoMsg{font-size:12px;line-height:1.45;color:var(--sawn);margin-bottom:8px;}
   #autoMsg b{color:var(--paint);font-size:17px;}
   .act{flex:1;background:var(--paint);color:var(--paint-ink);border:none;border-radius:10px;
-    padding:12px 4px;font-size:13px;font-weight:700;}
+    padding:11px 4px;font-size:13px;font-weight:700;}
   .act.ghost{background:var(--bark-2);color:var(--sawn-dim);border:1px solid var(--line);flex:0 0 80px;}
   .sub{flex:1;background:none;color:var(--sawn-dim);border:1px dashed var(--line);
     border-radius:10px;padding:9px 4px;font-size:11.5px;}
@@ -172,11 +196,11 @@
      下のバーのすぐ上に置く。位置は placePanels() が合わせる。 */
   #eraseBanner{position:fixed;left:0;right:0;bottom:0;padding:8px;
     background:#7A1D12;color:#FFE3DA;font-size:12px;text-align:center;font-weight:600;letter-spacing:.04em;}
-  #roiBanner{position:fixed;left:0;right:0;bottom:0;padding:10px 14px 12px;
+  #roiBanner{position:fixed;left:0;right:0;bottom:0;padding:7px 14px 9px;
     background:rgba(4,34,43,.96);color:#EAF7FB;backdrop-filter:blur(6px);}
-  #roiMsg{font-size:13px;font-weight:700;text-align:center;line-height:1.5;}
-  #roiCount{font-size:11.5px;color:#7FDCEF;text-align:center;margin-top:4px;font-variant-numeric:tabular-nums;}
-  #roiBanner .act{padding:10px 4px;font-size:12px;}
+  #roiMsg{font-size:12px;font-weight:700;text-align:center;line-height:1.4;}
+  #roiCount{font-size:11px;color:#7FDCEF;text-align:center;margin-top:2px;font-variant-numeric:tabular-nums;}
+  #roiBanner .act{padding:8px 4px;font-size:12px;}
   #roiBanner .act:disabled{opacity:.4;}
 
   /* 見た目パネル */
@@ -239,7 +263,7 @@
     background:var(--line);transition:background .15s,width .15s;}
   .grab.hot::before{background:var(--paint);width:56px;}
   .row{display:flex;align-items:center;gap:12px;}
-  .row+.row{margin-top:14px;}
+  .row+.row{margin-top:10px;}
   .lab{font-size:12px;color:var(--sawn-dim);width:52px;flex:none;letter-spacing:.06em;}
   #swatches{display:flex;gap:10px;flex:1;}
   .sw{width:34px;height:34px;border-radius:50%;border:2px solid transparent;flex:none;padding:0;}
@@ -377,11 +401,13 @@
   <div class="grab" aria-label="つまんで下げると閉じます"></div>
   <div id="saveMsg">保存の種類を選んでください。</div>
   <div id="saveCaution">この本数で記録に残ります。相違ないかご確認ください</div>
-  <div class="row" style="gap:8px">
-    <button id="savePng" class="act">画像を保存</button>
-  </div>
-  <div class="row" style="gap:8px">
-    <button id="saveData" class="act ghost2">学習データを保存</button>
+  <div id="saveBtns">
+    <div class="row" style="gap:8px">
+      <button id="savePng" class="act">画像を保存</button>
+    </div>
+    <div class="row" style="gap:8px">
+      <button id="saveData" class="act ghost2">学習データを保存</button>
+    </div>
   </div>
 </div>
 
@@ -440,7 +466,7 @@
 <div id="roiBanner" class="hide">
   <div id="roiMsg">写真の上を指でタップして、範囲の角を順番に囲んでください</div>
   <div id="roiCount">0点</div>
-  <div class="row" style="gap:6px;margin-top:8px">
+  <div class="row" style="gap:6px;margin-top:6px">
     <button id="roiUndo" class="act ghost" disabled>1つ戻す</button>
     <button id="roiFinish" class="act" disabled>この範囲に決定</button>
     <button id="roiCancel" class="act ghost">やめる</button>
@@ -453,7 +479,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v48';
+const APP_VER='v49';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -1367,7 +1393,7 @@ function placePanels(){
   const b=bar.offsetHeight+8;
   autoPanel.style.bottom=b+'px'; panel.style.bottom=b+'px'; hint.style.bottom=(b+6)+'px';
   calcPanel.style.bottom=b+'px'; roiGo.style.bottom=b+'px'; morePanel.style.bottom=b+'px';
-  statusPanel.style.bottom=b+'px';
+  statusPanel.style.bottom=b+'px'; savePanel.style.bottom=b+'px';
   fitTopBar();
   /* 画面の低い端末だと、パネルが本数バッジや右上のボタンに被る。
      上に置いてあるものの下から、下のバーまでの高さに収める。 */
