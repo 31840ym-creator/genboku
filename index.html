@@ -540,7 +540,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v55';
+const APP_VER='v56';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -1660,6 +1660,12 @@ roiFinishBtn.onclick=()=>{
   document.getElementById('roiAll').classList.remove('hide');
   autoMsg.textContent='範囲を指定しました。';
   endRoi(false);          // パネルは出さない（囲んだ形が見えるように）
+  /* 囲い終わったら写真ぜんぶを真ん中に出す。
+     角を打つ時に拡大していると、囲った形の全体が見えないまま
+     「この範囲で数える」を押すことになるため(2026-09-19)。 */
+  beforeFit=null;
+  document.getElementById('fit').innerHTML='<i>⤢</i>全体を表示';
+  fitView();
   showRoiGo(true);
   flash('囲んだ範囲を確かめてください', 6000);
 };
