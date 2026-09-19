@@ -71,8 +71,14 @@
   body.short #autoMsg{margin:0;flex:1;font-size:11px;line-height:1.3;}
   body.short #autoPanel .row{margin:0;flex:0 0 auto;width:auto;}
   body.short #autoPanel .row+.row{margin:0;}
-  body.short #autoPanel #redo{padding:7px 24px;font-size:14px;}
-  body.short #autoPanel #roiBtn, body.short #autoPanel #roiAll{padding:6px 12px;font-size:11px;}
+  /* 「数える」と「範囲を囲う」は同じ大きさにする(横幅も高さも) */
+  body.short #autoPanel #redo,
+  body.short #autoPanel #roiBtn,
+  body.short #autoPanel #roiAll{
+    width:118px;height:36px;padding:0 4px;font-size:14px;line-height:1;
+    border-width:1px;border-style:solid;box-sizing:border-box;
+    display:flex;align-items:center;justify-content:center;}
+  body.short #autoPanel #redo{border-color:var(--paint);}
   body.short #guessRow{flex:1 1 auto;min-width:160px;}
 
   /* 保存：説明と確認の文言を1行に並べ、ボタンは横並び */
@@ -92,8 +98,10 @@
 
   /* 範囲を囲う時の帯。1行にまとめる */
   body.short #roiBanner{padding:5px 10px 6px;display:flex;align-items:center;gap:10px;}
-  body.short #roiMsg{font-size:11px;text-align:left;flex:1;line-height:1.3;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+  /* 案内文の場所が潰れて「あ。」のように切れていた。
+     ボタンの取り分が先に決まるため、文字側に最低の幅を持たせる(2026-09-19) */
+  body.short #roiMsg{font-size:12px;font-weight:700;text-align:left;line-height:1.3;
+    white-space:nowrap;flex:0 0 auto;min-width:5.5em;}
   body.short #roiCount{margin:0;flex:0 0 auto;font-size:11px;}
   body.short #roiBanner .row{margin:0;flex:0 0 auto;}
   body.short #roiBanner .act{padding:6px 12px;font-size:11px;}
@@ -575,7 +583,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v62';
+const APP_VER='v63';
 document.getElementById('ver').textContent=APP_VER;
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -1666,7 +1674,7 @@ function updateRoiBanner(){
   roiCountEl.textContent = n===0 ? 'まだ0点'
     : (short ? `${n}点` : `${n}点　（3点以上で決定できます）`);
   roiMsgEl.textContent = short
-    ? (n===0 ? '写真をタップして角を囲む' : (n<3 ? `あと${3-n}点で決定できます` : '角を足せます'))
+    ? (n===0 ? '角をタップ' : (n<3 ? `あと${3-n}点` : '囲えます'))
     : (n===0 ? '写真の上を指でタップして、範囲の角を順番に囲んでください'
              : '続けてタップして角を足してください。指を動かせば拡大・移動もできます');
   roiUndoBtn.disabled = n===0;
