@@ -32,30 +32,50 @@
      横向きだと高さが375px程度しかないのに、案内のパネルが170px以上あって
      写真がほとんど見えなかった(2026-09-17)。
      文字を1行に詰め、ボタンを横に並べ、余白を削る。 */
+  /* ---- 横向き(背の低い画面)のパネル ----
+     高さが375px程度しかないので、パネルは**下のバーと同じくらいの薄さ**に収める。
+     文字は小さく1行、ボタンは横並び、余白は最小。つまみは重ねて高さを食わない。 */
   body.short #autoPanel, body.short #savePanel, body.short #morePanel,
-  body.short #panel, body.short #setPanel, body.short #statusPanel{padding:8px 12px 10px;border-radius:14px;overflow-x:hidden;}
+  body.short #panel, body.short #setPanel, body.short #statusPanel{
+    padding:5px 12px 7px;border-radius:13px;overflow-x:hidden;}
+  /* つまみは中身に重ねる（縦の場所を取らない） */
   body.short #autoPanel .grab, body.short #savePanel .grab, body.short #morePanel .grab,
-  body.short #panel .grab, body.short #setPanel .grab, body.short #statusPanel .grab{margin-bottom:4px;}
-  /* 案内文とボタンを1行にまとめる */
+  body.short #panel .grab, body.short #setPanel .grab, body.short #statusPanel .grab{
+    position:absolute;left:50%;transform:translateX(-50%);top:3px;margin:0;}
+  body.short .row+.row{margin-top:6px;}
+  body.short .act{padding:7px 4px;font-size:12px;}
+  body.short .sub{padding:7px 4px;font-size:12px;}
+
+  /* 自動：案内文＋ボタンを1行に。いちばんよく出るので特に薄くする */
   body.short #autoPanel{display:flex;align-items:center;gap:10px;}
-  body.short #autoPanel .grab{position:absolute;left:50%;transform:translateX(-50%);top:4px;margin:0;}
-  body.short #autoMsg{margin:0;flex:1;font-size:12px;line-height:1.35;}
+  body.short #autoMsg{margin:0;flex:1;font-size:11px;line-height:1.3;}
   body.short #autoPanel .row{margin:0;flex:0 0 auto;width:auto;}
   body.short #autoPanel .row+.row{margin:0;}
-  body.short #autoPanel #redo{padding:10px 26px;font-size:14px;}
-  body.short #autoPanel #roiBtn, body.short #autoPanel #roiAll{padding:9px 14px;font-size:12px;}
-  body.short #guessRow{flex:1 1 auto;min-width:180px;}
-  /* 保存・その他・見た目・設定も詰める */
-  body.short #saveMsg, body.short #saveCaution{font-size:11px;margin-bottom:6px;line-height:1.4;}
-  body.short .row+.row{margin-top:8px;}
-  body.short .act{padding:9px 4px;font-size:12px;}
+  body.short #autoPanel #redo{padding:7px 24px;font-size:14px;}
+  body.short #autoPanel #roiBtn, body.short #autoPanel #roiAll{padding:6px 12px;font-size:11px;}
+  body.short #guessRow{flex:1 1 auto;min-width:160px;}
 
-  /* 範囲を囲う時の帯。横向きでは1行にまとめる */
-  body.short #roiBanner{padding:6px 10px 8px;display:flex;align-items:center;gap:10px;}
-  body.short #roiMsg{font-size:11.5px;text-align:left;flex:1;line-height:1.35;}
+  /* 保存：説明と確認の文言を1行に並べ、ボタンは横並び */
+  body.short #saveMsg{font-size:11px;margin:0;line-height:1.3;}
+  body.short #saveCaution{font-size:11px;margin:0;line-height:1.3;}
+  body.short #saveHead{display:flex;align-items:center;gap:12px;margin-bottom:5px;}
+  body.short #saveBtns{display:flex;gap:8px;}
+  body.short #saveBtns .row{margin:0;flex:1;}
+
+  /* その他・設定：ボタンを1行に並べる */
+  body.short #morePanel .row{margin:0;}
+  body.short #morePanel{display:flex;gap:8px;flex-wrap:wrap;}
+  body.short #morePanel .row{flex:1 1 auto;}
+  body.short #setPanel .setHead{margin-bottom:4px;font-size:12px;}
+  body.short #setPanel #setReset{margin-top:6px;}
+  body.short .setRow{padding:5px 0;font-size:12px;}
+
+  /* 範囲を囲う時の帯。1行にまとめる */
+  body.short #roiBanner{padding:5px 10px 6px;display:flex;align-items:center;gap:10px;}
+  body.short #roiMsg{font-size:11px;text-align:left;flex:1;line-height:1.3;}
   body.short #roiCount{margin:0;flex:0 0 auto;font-size:11px;}
   body.short #roiBanner .row{margin:0;flex:0 0 auto;}
-  body.short #roiBanner .act{padding:9px 14px;font-size:12px;}
+  body.short #roiBanner .act{padding:6px 12px;font-size:11px;}
   body.short #roiBanner .act.ghost{flex:0 0 auto;}
 
   /* ---- 横向きの電卓 ----
@@ -438,8 +458,10 @@
 
 <div id="savePanel" class="hide">
   <div class="grab" aria-label="つまんで下げると閉じます"></div>
-  <div id="saveMsg">保存の種類を選んでください。</div>
-  <div id="saveCaution">この本数で記録に残ります。相違ないかご確認ください</div>
+  <div id="saveHead">
+    <div id="saveMsg">保存の種類を選んでください。</div>
+    <div id="saveCaution">この本数で記録に残ります。相違ないかご確認ください</div>
+  </div>
   <div id="saveBtns">
     <div class="row" style="gap:8px">
       <button id="savePng" class="act">画像を保存</button>
@@ -518,7 +540,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v54';
+const APP_VER='v55';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
