@@ -124,6 +124,7 @@
   .big.ghost{background:transparent;color:var(--paint);border:2px solid var(--paint);}
   #count{
     position:fixed;top:calc(10px + env(safe-area-inset-top));left:12px;
+    max-width:calc(100% - var(--topright,200px) - 28px);   /* 右上のボタンにぶつからない幅まで */
     background:rgba(30,22,16,.82);border:1px solid var(--line);border-radius:14px;
     padding:5px 12px 7px;display:grid;grid-template-columns:auto auto;
     align-items:baseline;column-gap:6px;backdrop-filter:blur(6px);
@@ -138,13 +139,14 @@
   /* 右上：電卓ボタンと版の表示を並べる */
   /* 最初の画面(#empty)が全画面に出るので、その上に重ねて押せるようにする */
   #topRight{position:fixed;top:calc(12px + env(safe-area-inset-top));right:12px;
-    display:flex;align-items:center;gap:8px;z-index:5;}
-  #calcBtn,#camBtn{background:rgba(30,22,16,.86);border:1px solid var(--line);
-    color:var(--sawn);border-radius:12px;padding:9px;line-height:0;backdrop-filter:blur(6px);}
+    display:flex;align-items:center;gap:7px;z-index:5;}
+  /* 向き・カメラ・電卓は同じ大きさに揃える(46x46)。ばらつくと目障りなので固定する */
+  #rotate,#calcBtn,#camBtn{width:46px;height:46px;padding:0;flex:none;
+    background:rgba(30,22,16,.86);border:1px solid var(--line);
+    color:var(--sawn);border-radius:12px;line-height:0;backdrop-filter:blur(6px);
+    display:flex;align-items:center;justify-content:center;}
   /* 向きの切り替え。押すと「横」⇄「縦」が入れ替わる */
-  #rotate{position:relative;background:rgba(30,22,16,.86);border:1px solid var(--line);
-    color:var(--sawn);border-radius:12px;width:44px;height:44px;backdrop-filter:blur(6px);
-    display:flex;align-items:center;justify-content:center;gap:0;padding:0;}
+  #rotate{position:relative;}
   #rotate svg{position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);
     opacity:.85;pointer-events:none;}
   #rotate b{position:relative;font-size:15px;font-weight:800;line-height:1;}
@@ -161,8 +163,8 @@
      以前は本数バッジだけ固定値で下げていて、右上のボタンが帯に被っていた。 */
 
   #ver{font-size:11px;color:var(--sawn-dim);background:rgba(30,22,16,.8);
-    border:1px solid var(--line);border-radius:8px;padding:6px 9px;letter-spacing:.05em;
-    backdrop-filter:blur(6px);white-space:nowrap;font-family:inherit;}
+    border:1px solid var(--line);border-radius:8px;padding:6px 8px;letter-spacing:.02em;
+    backdrop-filter:blur(6px);white-space:nowrap;font-family:inherit;flex:none;}
   #ver.on{border-color:var(--paint);}
 
   /* 設定。版バッジを押すと開く */
@@ -540,8 +542,8 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v57';
-document.getElementById('ver').textContent=APP_VER+' AI';
+const APP_VER='v58';
+document.getElementById('ver').textContent=APP_VER;
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const fileInput=document.getElementById('file');
@@ -919,7 +921,7 @@ async function load(file){
     resize(); fitView(); placePanels();
     loadAI().then(ok=>{
       const v=document.getElementById('ver');
-      v.textContent = APP_VER+(ok ? ' AI ○' : ' AI ×');
+      v.textContent = APP_VER+(ok ? ' ○' : ' ×');
       v.style.color = ok ? '#7CFF3B' : '#FF8A5C';
     });
   }finally{
@@ -1443,6 +1445,13 @@ const SENS=4;   // 感度は固定（利用者に選ばせない）
    固定値ではなく実測に合わせる。 */
 /* 案内の帯を、下のバーのすぐ上に置く。
    以前は画面の上に固定し、本数バッジを押し下げていた。 */
+/* 右上のボタンの幅を測って、本数バッジがそこへ食い込まないようにする。
+   端末の幅や版の文字数で変わるので、固定値では合わない(2026-09-19)。 */
+function fitTopRight(){
+  const t=document.getElementById('topRight');
+  if(t) document.documentElement.style.setProperty('--topright', t.offsetWidth+'px');
+}
+
 function fitTopBar(){
   const b=bar.offsetHeight+8;
   for(const id of ['eraseBanner','roiBanner']){
@@ -1456,6 +1465,7 @@ function placePanels(){
   autoPanel.style.bottom=b+'px'; panel.style.bottom=b+'px'; hint.style.bottom=(b+6)+'px';
   calcPanel.style.bottom=b+'px'; roiGo.style.bottom=b+'px'; morePanel.style.bottom=b+'px';
   statusPanel.style.bottom=b+'px'; savePanel.style.bottom=b+'px';
+  fitTopRight();
   fitTopBar();
   /* 画面の低い端末だと、パネルが本数バッジや右上のボタンに被る。
      上に置いてあるものの下から、下のバーまでの高さに収める。 */
