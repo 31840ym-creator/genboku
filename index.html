@@ -66,19 +66,23 @@
   body.short .act{padding:7px 4px;font-size:12px;}
   body.short .sub{padding:7px 4px;font-size:12px;}
 
-  /* 自動：案内文＋ボタンを1行に。いちばんよく出るので特に薄くする */
-  body.short #autoPanel{display:flex;align-items:center;gap:10px;}
-  body.short #autoMsg{margin:0;flex:1;font-size:11px;line-height:1.3;}
+  /* 自動：横向きは**案内文を出さない**。ボタン2つだけの細い箱にする。
+     文字を入れると幅を取り合って折り返し、パネルが分厚くなっていた(2026-09-19) */
+  body.short #autoPanel{display:flex;align-items:center;gap:8px;width:auto;}
+  body.short #autoMsg{display:none;}
   body.short #autoPanel .row{margin:0;flex:0 0 auto;width:auto;}
   body.short #autoPanel .row+.row{margin:0;}
-  /* 「数える」と「範囲を囲う」は同じ大きさにする(横幅も高さも) */
+  /* 「数える」と「範囲を囲う」は同じ大きさ。
+     枠のある・なしで高さがずれないよう box-sizing と height を明示する */
   body.short #autoPanel #redo,
   body.short #autoPanel #roiBtn,
   body.short #autoPanel #roiAll{
-    width:118px;height:36px;padding:0 4px;font-size:14px;line-height:1;
-    border-width:1px;border-style:solid;box-sizing:border-box;
+    width:132px;height:40px;min-height:0;padding:0;margin:0;
+    font-size:15px;font-weight:700;line-height:1;border-radius:10px;
+    border:1px solid transparent;box-sizing:border-box;flex:none;
     display:flex;align-items:center;justify-content:center;}
-  body.short #autoPanel #redo{border-color:var(--paint);}
+  body.short #autoPanel #roiBtn, body.short #autoPanel #roiAll{
+    border-color:var(--line);border-style:dashed;}
   body.short #guessRow{flex:1 1 auto;min-width:160px;}
 
   /* 保存：説明と確認の文言を1行に並べ、ボタンは横並び */
@@ -97,14 +101,15 @@
   body.short .setRow{padding:5px 0;font-size:12px;}
 
   /* 範囲を囲う時の帯。1行にまとめる */
-  body.short #roiBanner{padding:5px 10px 6px;display:flex;align-items:center;gap:10px;}
-  /* 案内文の場所が潰れて「あ。」のように切れていた。
-     ボタンの取り分が先に決まるため、文字側に最低の幅を持たせる(2026-09-19) */
-  body.short #roiMsg{font-size:12px;font-weight:700;text-align:left;line-height:1.3;
-    white-space:nowrap;flex:0 0 auto;min-width:5.5em;}
-  body.short #roiCount{margin:0;flex:0 0 auto;font-size:11px;}
+  body.short #roiBanner{padding:5px 10px 6px;display:flex;align-items:center;gap:8px;width:auto;}
+  /* 横向きは案内文を出さない。点数(「2点」など)だけで用は足りる。
+     文字を入れるとボタンと幅を取り合って切れたり折り返したりした(2026-09-19) */
+  body.short #roiMsg{display:none;}
+  body.short #roiCount{margin:0;flex:0 0 auto;font-size:13px;font-weight:700;min-width:3.5em;}
   body.short #roiBanner .row{margin:0;flex:0 0 auto;}
-  body.short #roiBanner .act{padding:6px 12px;font-size:11px;}
+  body.short #roiBanner .act{width:auto;min-width:76px;height:36px;padding:0 10px;
+    font-size:12px;line-height:1;box-sizing:border-box;flex:none;
+    display:flex;align-items:center;justify-content:center;}
   body.short #roiBanner .act.ghost{flex:0 0 auto;}
 
   /* 見た目パネル。横向きでは4行が縦に積まれて画面の半分を食う。
@@ -583,7 +588,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v63';
+const APP_VER='v64';
 document.getElementById('ver').textContent=APP_VER;
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
