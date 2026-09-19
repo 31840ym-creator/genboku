@@ -183,7 +183,9 @@
   #autoMsg b{color:var(--paint);font-size:17px;}
   .act{flex:1;background:var(--paint);color:var(--paint-ink);border:none;border-radius:10px;
     padding:11px 4px;font-size:13px;font-weight:700;}
-  .act.ghost{background:var(--bark-2);color:var(--sawn-dim);border:1px solid var(--line);flex:0 0 80px;}
+  /* 以前は文字も枠も暗く、押せるように見えなかった。はっきりさせる(2026-09-19) */
+  .act.ghost{background:#3A2C1F;color:var(--sawn);border:1px solid #6B5334;flex:0 0 80px;font-weight:700;}
+  .act.ghost:active{background:#4A392A;}
   .sub{flex:1;background:none;color:var(--sawn-dim);border:1px dashed var(--line);
     border-radius:10px;padding:9px 4px;font-size:11.5px;}
   .sub:active{color:#00C6FF;border-color:#2A5A6B;}
@@ -201,7 +203,10 @@
   #roiMsg{font-size:12px;font-weight:700;text-align:center;line-height:1.4;}
   #roiCount{font-size:11px;color:#7FDCEF;text-align:center;margin-top:2px;font-variant-numeric:tabular-nums;}
   #roiBanner .act{padding:8px 4px;font-size:12px;}
-  #roiBanner .act:disabled{opacity:.4;}
+  #roiBanner .act:disabled{opacity:.45;}
+  /* 囲いの帯は背景が濃い青なので、そこに合う明るさにする */
+  #roiBanner .act.ghost{background:#0E4353;color:#EAF7FB;border-color:#3E8BA5;}
+  #roiBanner .act.ghost:active{background:#165F75;}
 
   /* 見た目パネル */
   #panel{position:fixed;left:8px;right:8px;bottom:calc(84px + env(safe-area-inset-bottom));
@@ -359,11 +364,15 @@
 <div id="bar" class="hide">
   <button id="pick"><i>🖼</i>写真</button>
   <button id="auto"><i>🤖</i>自動</button>
-  <button id="undo"><i>↩</i>戻す</button>
-  <button id="erase"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-    stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">
-    <path d="M8.6 20.5 3.5 15.4a1.6 1.6 0 0 1 0-2.3L12.9 3.7a1.6 1.6 0 0 1 2.3 0l5.1 5.1a1.6 1.6 0 0 1 0 2.3l-9.4 9.4z"/>
-    <path d="M7.6 8.9 15.1 16.4"/><path d="M8.6 20.5H21"/></svg></i>消す</button>
+  <button id="clear"><i>✕</i>全消去</button>
+  <button id="erase"><i><svg viewBox="0 0 24 24" aria-hidden="true">
+    <!-- 消しゴム。写真や自動の絵文字と同じように、色で一目で分かるようにする -->
+    <path d="M8.6 20.5 3.5 15.4a1.6 1.6 0 0 1 0-2.3L12.9 3.7a1.6 1.6 0 0 1 2.3 0l5.1 5.1a1.6 1.6 0 0 1 0 2.3l-9.4 9.4z"
+          fill="#FF8FA3" stroke="#8E2C41" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="M7.6 8.9 15.1 16.4 10.9 20.5 3.5 15.4a1.6 1.6 0 0 1 0-2.3z"
+          fill="#E6E6E6" stroke="#8E2C41" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="M8.6 20.5H21" stroke="#8E2C41" stroke-width="1.9" stroke-linecap="round"/>
+  </svg></i>消す</button>
   <button id="save"><i>⬇</i>保存</button>
   <button id="more"><i>⋯</i>その他</button>
 </div>
@@ -375,7 +384,7 @@
     <button id="look" class="act ghost2"><i>🎨</i>見た目</button>
   </div>
   <div class="row" style="gap:8px">
-    <button id="clear" class="act ghost2"><i>✕</i>印を全部消す</button>
+    <button id="undo" class="act ghost2"><i>↩</i>1つ戻す</button>
     <button id="openSet" class="act ghost2"><i>⚙</i>設定</button>
   </div>
 </div>
@@ -479,7 +488,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v49';
+const APP_VER='v50';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -907,7 +916,7 @@ function shootPhoto(){
 document.getElementById('camBtn').onclick=shootPhoto;
 document.getElementById('shootBig').onclick=shootPhoto;
 
-document.getElementById('undo').onclick=()=>{ marks.pop(); updateCount(); draw(); };
+document.getElementById('undo').onclick=()=>{ marks.pop(); updateCount(); draw(); closeMore(); };
 const eraseBtn=document.getElementById('erase'), eraseBanner=document.getElementById('eraseBanner');
 eraseBtn.onclick=()=>{
   eraseMode=!eraseMode;
@@ -1021,7 +1030,7 @@ document.getElementById('fit').onclick=()=>{
   draw(); closeMore();
 };
 document.getElementById('clear').onclick=()=>{
-  if(marks.length&&confirm('印を全部消しますか？')){ marks=[]; resetTally(); updateCount(); draw(); closeMore(); }
+  if(marks.length&&confirm('印を全部消しますか？')){ marks=[]; resetTally(); updateCount(); draw(); }
 };
 
 /* ---- 見た目の設定を覚えておく ----
