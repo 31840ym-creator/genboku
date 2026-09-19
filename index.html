@@ -32,6 +32,25 @@
      横向きだと高さが375px程度しかないのに、案内のパネルが170px以上あって
      写真がほとんど見えなかった(2026-09-17)。
      文字を1行に詰め、ボタンを横に並べ、余白を削る。 */
+  /* ---- 横向きの下まわりの配置(2026-09-19) ----
+
+     横向きは**横に広い**ので、下のバーを画面いっぱいに伸ばす意味がない。
+     ボタンは縦向きと同じ大きさのまま**右へ寄せ**、
+     空いた**左下**に案内のパネル(数える・範囲を囲う など)を置く。
+     こうすると両方が同じ帯に収まり、写真の見える高さが1段分ぶん増える。 */
+  body.short #bar{justify-content:flex-end;gap:6px;
+    background:linear-gradient(to top,rgba(30,22,16,.55),rgba(30,22,16,0));}
+  body.short #bar button{flex:0 0 auto;width:62px;
+    background:rgba(38,30,22,.94);backdrop-filter:blur(6px);}
+  /* パネルは左下。幅は「ボタンの手前まで」に収める(--panelmax はJSが実測して入れる) */
+  body.short #autoPanel, body.short #savePanel, body.short #morePanel,
+  body.short #panel, body.short #setPanel, body.short #statusPanel,
+  body.short #roiBanner, body.short #eraseBanner, body.short #roiGo{
+    left:8px;right:auto;width:auto;max-width:var(--panelmax,60%);}
+  /* 帯も浮いた箱になるので角を丸める */
+  body.short #roiBanner, body.short #eraseBanner{border-radius:13px;}
+  body.short #eraseBanner{padding:9px 14px;}
+
   /* ---- 横向き(背の低い画面)のパネル ----
      高さが375px程度しかないので、パネルは**下のバーと同じくらいの薄さ**に収める。
      文字は小さく1行、ボタンは横並び、余白は最小。つまみは重ねて高さを食わない。 */
@@ -89,6 +108,7 @@
      こうするとキーが正方形に近くなり、押しやすくなる。
      電卓そのものを画面いっぱいに広げはしない(最大640px・中央)。 */
   body.short #calcPanel{
+    left:8px;right:8px;margin:0 auto;
     display:grid;
     grid-template-columns:minmax(0,1fr) 204px;   /* 長い式で押し広げられないように */
     grid-template-rows:auto auto auto 1fr;
@@ -542,7 +562,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v58';
+const APP_VER='v59';
 document.getElementById('ver').textContent=APP_VER;
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -1453,35 +1473,50 @@ function fitTopRight(){
 }
 
 function fitTopBar(){
-  const b=bar.offsetHeight+8;
+  // 横向きは左下（バーと同じ帯）、縦向きはバーの上
+  const short=document.body.classList.contains('short');
+  const y = short ? 8 : bar.offsetHeight+8;
   for(const id of ['eraseBanner','roiBanner']){
     const el=document.getElementById(id);
-    if(el) el.style.bottom=b+'px';
+    if(el) el.style.bottom=y+'px';
   }
 }
 
 function placePanels(){
+  const short=document.body.classList.contains('short');
   const b=bar.offsetHeight+8;
-  autoPanel.style.bottom=b+'px'; panel.style.bottom=b+'px'; hint.style.bottom=(b+6)+'px';
-  calcPanel.style.bottom=b+'px'; roiGo.style.bottom=b+'px'; morePanel.style.bottom=b+'px';
-  statusPanel.style.bottom=b+'px'; savePanel.style.bottom=b+'px';
+
+  /* 横向きは、下のバーのボタンを右へ寄せて左下を空けている。
+     パネルはその**空いた左下**に、バーと同じ帯の高さで置く。
+     縦向きは今までどおりバーの上に重ねる。 */
+  const firstBtn=bar.querySelector('button');
+  const panelBottom = short ? 8 : b;
+  const panelMax = short
+    ? Math.max(180, (firstBtn ? firstBtn.offsetLeft : bar.offsetWidth) - 16)
+    : 0;
+  document.documentElement.style.setProperty('--panelmax', panelMax ? panelMax+'px' : '');
+
+  for(const el of [autoPanel, panel, roiGo, morePanel, statusPanel, savePanel, setPanel])
+    el.style.bottom = panelBottom+'px';
+  calcPanel.style.bottom = b+'px';           // 電卓は真ん中なのでバーの上
+  hint.style.bottom = (b+6)+'px';
+
   fitTopRight();
   fitTopBar();
   /* 画面の低い端末だと、パネルが本数バッジや右上のボタンに被る。
-     上に置いてあるものの下から、下のバーまでの高さに収める。 */
-  /* 回している時 getBoundingClientRect は画面基準の外枠を返すので使えない。
+     上に置いてあるものの下から、下のバーまでの高さに収める。
+     回している時 getBoundingClientRect は画面基準の外枠を返すので使えない。
      並びの位置(offsetTop/offsetHeight)は回転の影響を受けないのでこちらを使う。 */
   const below=el=>el.offsetTop+el.offsetHeight;
   const topEnd=Math.max(below(document.getElementById('topRight')), below(countBox)) + 8;
   // 横向きに回している時、使える高さは画面の「幅」の方
-  const room=Math.max(200, (land?innerWidth:innerHeight) - b - topEnd);
-  for(const el of [calcPanel, autoPanel, savePanel, panel, setPanel, morePanel, statusPanel]) el.style.maxHeight=room+'px';
+  const room=Math.max(200, (land?innerWidth:innerHeight) - panelBottom - topEnd);
+  for(const el of [calcPanel, autoPanel, savePanel, panel, setPanel, morePanel, statusPanel])
+    el.style.maxHeight=room+'px';
   /* 横向きの電卓は、キーの段を画面の高さいっぱいに広げる。
      そうしないと左側(式や履歴)の高さに引っ張られ、キーが横に長く潰れる。 */
   const kb=document.getElementById('calcKeys');
-  if(kb) kb.style.minHeight = document.body.classList.contains('short')
-    ? Math.max(120, room-48)+'px' : '';
-  setPanel.style.bottom=b+'px';
+  if(kb) kb.style.minHeight = short ? Math.max(120, room-b-48)+'px' : '';
 }
 guess.addEventListener('input',()=>{ guessVal.textContent=guess.value+'本'; });
 
