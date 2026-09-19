@@ -255,7 +255,9 @@
   #morePanel{position:fixed;left:8px;right:8px;bottom:150px;
     background:rgba(38,30,22,.97);border:1px solid var(--line);border-radius:16px;
     padding:8px 16px 16px;backdrop-filter:blur(8px);overflow-y:auto;overflow-x:hidden;}
-  #morePanel .act i{font-style:normal;margin-right:6px;}
+  #morePanel .act i{font-style:normal;margin-right:6px;display:inline-flex;
+    align-items:center;vertical-align:-3px;}
+  #morePanel .act i svg{width:17px;height:17px;display:block;}
   #savePanel{position:fixed;left:8px;right:8px;bottom:150px;
     background:rgba(38,30,22,.97);border:1px solid var(--line);border-radius:16px;
     padding:14px 16px 16px;backdrop-filter:blur(8px);}
@@ -364,9 +366,9 @@
   .sw[aria-pressed="true"]{border-color:var(--sawn);box-shadow:0 0 0 3px rgba(233,220,196,.18);}
   input[type=range]{flex:1;accent-color:var(--paint);height:34px;}
   #preview{width:44px;flex:none;display:flex;align-items:center;justify-content:center;}
-  #togNum,#togSnd{background:var(--bark-2);color:var(--sawn-dim);border:1px solid var(--line);
+  #togNum,#togSnd,#togFit{background:var(--bark-2);color:var(--sawn-dim);border:1px solid var(--line);
     border-radius:999px;padding:8px 16px;font-size:12px;font-weight:600;}
-  #togNum.on,#togSnd.on{color:var(--paint);border-color:var(--paint);}
+  #togNum.on,#togSnd.on,#togFit.on{color:var(--paint);border-color:var(--paint);}
 
   /* 写真の上に少しの間だけ出る知らせ。どんな写真の上でも読めるよう帯を敷く */
   #hint{position:fixed;left:0;right:0;bottom:88px;text-align:center;font-size:12px;
@@ -449,6 +451,10 @@
     <span id="preview"></span>
   </div>
   <div class="row">
+    <span class="lab">合わせ方</span>
+    <button id="togFit" class="on">木口に合わせる</button>
+  </div>
+  <div class="row">
     <span class="lab">番号</span>
     <button id="togNum" class="on">番号を表示する</button>
   </div>
@@ -464,7 +470,7 @@
 <div id="bar" class="hide">
   <button id="pick"><i>🖼</i>写真</button>
   <button id="auto"><i>🤖</i>自動</button>
-  <button id="fit"><i>⤢</i>全体</button>
+  <button id="fit"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3H3v6"/><path d="M3 3l7 7"/><path d="M15 3h6v6"/><path d="M21 3l-7 7"/><path d="M9 21H3v-6"/><path d="M3 21l7-7"/><path d="M15 21h6v-6"/><path d="M21 21l-7-7"/></svg></i>全体</button>
   <button id="erase"><i><svg viewBox="0 0 24 24" aria-hidden="true">
     <!-- 消しゴム。写真や自動の絵文字と同じように、色で一目で分かるようにする -->
     <path d="M8.6 20.5 3.5 15.4a1.6 1.6 0 0 1 0-2.3L12.9 3.7a1.6 1.6 0 0 1 2.3 0l5.1 5.1a1.6 1.6 0 0 1 0 2.3l-9.4 9.4z"
@@ -480,11 +486,11 @@
 <div id="morePanel" class="hide">
   <div class="grab" aria-label="つまんで下げると閉じます"></div>
   <div class="row" style="gap:8px">
-    <button id="clear" class="act ghost2"><i>✕</i>印を全部消す</button>
+    <button id="clear" class="act ghost2"><i>✕</i>全消去</button>
     <button id="look" class="act ghost2"><i>🎨</i>見た目</button>
   </div>
   <div class="row" style="gap:8px">
-    <button id="undo" class="act ghost2"><i>↩</i>1つ戻す</button>
+    <button id="undo" class="act ghost2"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10h10a5.5 5.5 0 0 1 0 11h-4"/><path d="M8 5.5 3.5 10 8 14.5"/></svg></i>戻す</button>
     <button id="openSet" class="act ghost2"><i>⚙</i>設定</button>
   </div>
 </div>
@@ -590,7 +596,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v65';
+const APP_VER='v66';
 document.getElementById('ver').textContent=APP_VER;
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -769,9 +775,14 @@ let aiCount=null, addCount=0, delCount=0;
 function resetTally(){ aiCount=null; addCount=0; delCount=0; }
 
 let logSpan=0;            // 木口の間隔(元画像の画素)。測れない時は0
-function measureSpan(){
+/* **一度測ったら変えない。**
+   タップするたびに測り直していたため、印を足すたびに全部の印の大きさが
+   わずかに変わり、落ち着かなかった(2026-09-19に指摘を受けた)。
+   写真を替えた時と、AIで数え直した時だけ測り直す(force=true)。 */
+function measureSpan(force){
   const n=marks.length;
-  if(n<3){ logSpan=0; return; }
+  if(n<3){ if(force) logSpan=0; return; }
+  if(!force && logSpan>0) return;
   // 数が多い時は間引いて測る(全部見ると重い)
   const step=Math.max(1,Math.floor(n/120));
   const a=[]; for(let i=0;i<n;i+=step) a.push(marks[i]);
@@ -789,10 +800,19 @@ function measureSpan(){
   d.sort((x,y)=>x-y);
   logSpan=d[d.length>>1];
 }
-/* 画面に描く時の印の半径。木口に合わせ、「大きさ」の調整を掛ける。 */
+/* 画面に描く時の印の半径。
+
+   fitMark=true  … 写真に写っている木口に合わせる(既定)
+   fitMark=false … 木口とは無関係に、自分で決めた大きさにする
+
+   どちらも**拡大すると一緒に大きくなる**(印が木口からずれないように)。 */
+let fitMark=true;
+let manualBase=11;        // 自分で決める時の半径(全体表示に直した画素)
 function markRadius(){
-  const base = logSpan>0 ? logSpan*view.s*0.45 : 11;
-  return Math.max(2, Math.min(40, base*markScale));
+  const base = (fitMark && logSpan>0)
+    ? logSpan*view.s*0.45                          // 木口に合わせる
+    : manualBase*(fitS>0 ? view.s/fitS : 1);       // 自分で決める(写真が変わっても大きさは変えない)
+  return Math.max(2, Math.min(60, base*markScale));
 }
 function updateCount(){
   numEl.textContent=marks.length;
@@ -950,7 +970,7 @@ async function load(file){
     if(img&&img.close) img.close();
     if(curURL) URL.revokeObjectURL(curURL);
     img=bmp; curURL=url;
-    marks=[]; view={s:1,x:0,y:0}; resetTally(); updateCount();
+    marks=[]; view={s:1,x:0,y:0}; resetTally(); logSpan=0; updateCount();
     // 横向きの指定はそのまま引き継ぐ（同じ現場で続けて撮るため）
     gdata=null; roi=null; lastRoi=null; roiMode=false; roiDraft=[]; guide=false;
     document.getElementById('roiGo').classList.add('hide');
@@ -1115,7 +1135,7 @@ applyLand(); shortScreen();
 /* 押すと写真ぜんぶを真ん中に出す。下のバーにあるのでよく使う */
 document.getElementById('fit').onclick=()=>{ fitView(); };
 document.getElementById('clear').onclick=()=>{
-  if(marks.length&&confirm('印を全部消しますか？')){ marks=[]; resetTally(); updateCount(); draw(); closeMore(); }
+  if(marks.length&&confirm('印を全部消しますか？')){ marks=[]; resetTally(); logSpan=0; updateCount(); draw(); closeMore(); }
 };
 
 /* ---- 見た目の設定を覚えておく ----
@@ -1125,7 +1145,7 @@ const PREF_KEY='genboku-pref';
 function savePref(){
   try{
     localStorage.setItem(PREF_KEY, JSON.stringify({
-      color:markColor, scale:markScale, nums:showNums, snd:soundOn
+      color:markColor, scale:markScale, nums:showNums, snd:soundOn, fit:fitMark, mbase:manualBase
     }));
   }catch(e){}
 }
@@ -1138,6 +1158,8 @@ function loadPref(){
   if(typeof d.scale==='number' && d.scale>=0.25 && d.scale<=1.15) markScale=d.scale;
   if(typeof d.nums==='boolean') showNums=d.nums;
   if(typeof d.snd==='boolean') soundOn=d.snd;
+  if(typeof d.fit==='boolean') fitMark=d.fit;
+  if(typeof d.mbase==='number' && d.mbase>=4 && d.mbase<=30) manualBase=d.mbase;
   // 以前の版で保存された d.conf は読まない（厳しさは0.25に固定したため）
 }
 
@@ -1176,6 +1198,17 @@ togNum.onclick=()=>{
   showNums=!showNums;
   togNum.classList.toggle('on',showNums);
   togNum.textContent=showNums?'番号を表示する':'番号を表示しない';
+  draw(); savePref();
+};
+/* 木口に合わせるかどうか。合わせないと、写真によらず同じ大きさで描く */
+const togFit=document.getElementById('togFit');
+togFit.onclick=()=>{
+  // 「自分で決める」に移る時は、今見えている大きさをそのまま引き継ぐ。
+  // いきなり大きさが飛ぶと、どこを触ったのか分からなくなるため。
+  if(fitMark && logSpan>0 && fitS>0) manualBase=Math.max(4, Math.min(30, logSpan*fitS*0.45));
+  fitMark=!fitMark;
+  togFit.classList.toggle('on',fitMark);
+  togFit.textContent=fitMark?'木口に合わせる':'自分で決める';
   draw(); savePref();
 };
 const togSnd=document.getElementById('togSnd');
@@ -1630,7 +1663,7 @@ async function runAuto(){
     // 上の段から左→右の順に番号がつくよう並べ替え
     const rowH=img.height*0.05;
     pts.sort((a,b)=> Math.abs(a.y-b.y)>rowH ? a.y-b.y : a.x-b.x);
-    marks=pts; aiCount=pts.length; addCount=0; delCount=0;
+    marks=pts; aiCount=pts.length; addCount=0; delCount=0; logSpan=0; measureSpan(true);
     guide=false; updateCount();
     lastRoi=roi;   // 学習データ用に、どこを囲って数えたかを覚えておく
     roi=null; document.getElementById('roiAll').classList.add('hide'); showRoiGo(false);
@@ -2186,6 +2219,8 @@ loadPref();
   togNum.textContent=showNums?'番号を表示する':'番号を表示しない';
   togSnd.classList.toggle('on',soundOn);
   togSnd.textContent=soundOn?'タップ音を鳴らす':'タップ音を消す';
+  togFit.classList.toggle('on',fitMark);
+  togFit.textContent=fitMark?'木口に合わせる':'自分で決める';
 })();
 /* ブラウザが color を rgb() 形式で返すことがあるので、比べる前に揃える */
 function rgbToHex(v){
