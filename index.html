@@ -616,7 +616,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v69';
+const APP_VER='v70';
 document.getElementById('ver').textContent=APP_VER;
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -994,7 +994,7 @@ async function load(file){
     // 横向きの指定はそのまま引き継ぐ（同じ現場で続けて撮るため）
     gdata=null; roi=null; lastRoi=null; roiMode=false; roiDraft=[]; guide=false;
     document.getElementById('roiGo').classList.add('hide');
-    document.getElementById('roiAll').classList.add('hide');
+    showRoiSet(false);
     logR=0;
     document.getElementById('autoPanel').classList.add('hide');
     eraseMode=false;
@@ -1688,7 +1688,7 @@ async function runAuto(){
     marks=pts; aiCount=pts.length; addCount=0; delCount=0; logSpan=0; measureSpan(true);
     guide=false; updateCount();
     lastRoi=roi;   // 学習データ用に、どこを囲って数えたかを覚えておく
-    roi=null; document.getElementById('roiAll').classList.add('hide'); showRoiGo(false);
+    roi=null; showRoiSet(false); showRoiGo(false);
     draw();
     // 数え終わったら写真を確かめたいので、パネルは畳んで写真を見せる
     closeAuto();
@@ -1768,6 +1768,13 @@ function endRoi(backToPanel=true){
 
 /* 範囲を囲った後は、囲んだ形を確かめられるよう写真を隠さない。
    パネルの代わりに「数える」だけを下に細く出す。 */
+/* 範囲が決まっている間は「範囲を囲う」は出さない。
+   もう囲ってあるので押す意味がなく、「範囲を解除」と並ぶと紛らわしい(2026-09-20)。
+   囲い直したい時は、いったん解除してから囲う */
+function showRoiSet(on){
+  document.getElementById('roiAll').classList.toggle('hide', !on);
+  document.getElementById('roiBtn').classList.toggle('hide', on);
+}
 const roiGo=document.getElementById('roiGo');
 function showRoiGo(on){
   roiGo.classList.toggle('hide', !on);
@@ -1786,7 +1793,7 @@ roiFinishBtn.onclick=()=>{
   let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
   for(const p of roiDraft){ x0=Math.min(x0,p.x); y0=Math.min(y0,p.y); x1=Math.max(x1,p.x); y1=Math.max(y1,p.y); }
   roi={points:roiDraft.slice(), x0,y0,x1,y1};
-  document.getElementById('roiAll').classList.remove('hide');
+  showRoiSet(true);
   autoMsg.textContent='範囲を指定しました。';
   endRoi(false);          // パネルは出さない（囲んだ形が見えるように）
   /* 囲い終わったら写真ぜんぶを真ん中に出す。
@@ -1798,7 +1805,7 @@ roiFinishBtn.onclick=()=>{
 };
 document.getElementById('roiAll').onclick=()=>{
   roi=null; lastRoi=null; roiMode=false; roiDraft=[];
-  document.getElementById('roiAll').classList.add('hide');
+  showRoiSet(false);
   showRoiGo(false);
   autoMsg.textContent='範囲を解除しました。写真全体から数えます。'; draw();
 };
@@ -1806,7 +1813,7 @@ document.getElementById('roiAll').onclick=()=>{
 document.getElementById('roiGoBtn').onclick=()=>{ showRoiGo(false); runAuto(); };
 /* 囲み直す */
 document.getElementById('roiRedo').onclick=()=>{
-  roi=null; document.getElementById('roiAll').classList.add('hide');
+  roi=null; showRoiSet(false);
   showRoiGo(false); draw();
   startRoi();
 };
