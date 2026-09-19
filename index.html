@@ -395,7 +395,7 @@
   </div>
   <div class="row">
     <span class="lab">大きさ</span>
-    <input type="range" id="size" min="25" max="100" step="5" value="100">
+    <input type="range" id="size" min="25" max="115" step="5" value="100">
     <span id="preview"></span>
   </div>
   <div class="row">
@@ -540,7 +540,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v56';
+const APP_VER='v57';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -1102,7 +1102,7 @@ function loadPref(){
   if(COLORS.includes(d.color)) markColor=d.color;
   // 以前の版の size(画素そのもの)は読まない。いまは倍率で持つ
   // 以前の版は0.5〜1.6だった。範囲を外れた値は採用せず既定に戻す
-  if(typeof d.scale==='number' && d.scale>=0.25 && d.scale<=1.0) markScale=d.scale;
+  if(typeof d.scale==='number' && d.scale>=0.25 && d.scale<=1.15) markScale=d.scale;
   if(typeof d.nums==='boolean') showNums=d.nums;
   if(typeof d.snd==='boolean') soundOn=d.snd;
   // 以前の版で保存された d.conf は読まない（厳しさは0.25に固定したため）
