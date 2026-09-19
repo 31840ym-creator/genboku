@@ -57,10 +57,11 @@
   body.short #autoPanel, body.short #savePanel, body.short #morePanel,
   body.short #panel, body.short #setPanel, body.short #statusPanel{
     padding:5px 12px 7px;border-radius:13px;overflow-x:hidden;}
-  /* つまみは中身に重ねる（縦の場所を取らない） */
+  /* つまみは横向きでは出さない。中身に重なって読めなくなるため。
+     パネルは同じボタンをもう一度押せば閉じられる(2026-09-19) */
   body.short #autoPanel .grab, body.short #savePanel .grab, body.short #morePanel .grab,
-  body.short #panel .grab, body.short #setPanel .grab, body.short #statusPanel .grab{
-    position:absolute;left:50%;transform:translateX(-50%);top:3px;margin:0;}
+  body.short #panel .grab, body.short #setPanel .grab, body.short #statusPanel .grab,
+  body.short #calcPanel .grab{display:none;}
   body.short .row+.row{margin-top:6px;}
   body.short .act{padding:7px 4px;font-size:12px;}
   body.short .sub{padding:7px 4px;font-size:12px;}
@@ -91,11 +92,23 @@
 
   /* 範囲を囲う時の帯。1行にまとめる */
   body.short #roiBanner{padding:5px 10px 6px;display:flex;align-items:center;gap:10px;}
-  body.short #roiMsg{font-size:11px;text-align:left;flex:1;line-height:1.3;}
+  body.short #roiMsg{font-size:11px;text-align:left;flex:1;line-height:1.3;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
   body.short #roiCount{margin:0;flex:0 0 auto;font-size:11px;}
   body.short #roiBanner .row{margin:0;flex:0 0 auto;}
   body.short #roiBanner .act{padding:6px 12px;font-size:11px;}
   body.short #roiBanner .act.ghost{flex:0 0 auto;}
+
+  /* 見た目パネル。横向きでは4行が縦に積まれて画面の半分を食う。
+     ラベルと丸を小さくし、行の間を詰める */
+  body.short #panel .row{gap:8px;}
+  body.short #panel .row+.row{margin-top:6px;}
+  body.short .lab{width:38px;font-size:11px;}
+  body.short .sw{width:26px;height:26px;}
+  body.short #swatches{gap:7px;}
+  body.short input[type=range]{height:26px;}
+  body.short #preview{width:32px;}
+  body.short #panel button{padding:6px 10px;font-size:11px;}
 
   /* ---- 横向きの電卓 ----
 
@@ -562,7 +575,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v59';
+const APP_VER='v60';
 document.getElementById('ver').textContent=APP_VER;
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -1658,10 +1671,15 @@ const roiFinishBtn=document.getElementById('roiFinish');
 
 function updateRoiBanner(){
   const n=roiDraft.length;
-  roiCountEl.textContent = n===0 ? 'まだ0点' : `${n}点　（3点以上で決定できます）`;
-  roiMsgEl.textContent = n===0
-    ? '写真の上を指でタップして、範囲の角を順番に囲んでください'
-    : '続けてタップして角を足してください。指を動かせば拡大・移動もできます';
+  /* 横向きは帯を置ける幅が狭いので、長い案内文だと何行にも折り返して
+     画面の半分を占めてしまう。短い言い方に切り替える(2026-09-19)。 */
+  const short=document.body.classList.contains('short');
+  roiCountEl.textContent = n===0 ? 'まだ0点'
+    : (short ? `${n}点` : `${n}点　（3点以上で決定できます）`);
+  roiMsgEl.textContent = short
+    ? (n===0 ? '写真をタップして角を囲む' : (n<3 ? `あと${3-n}点で決定できます` : '角を足せます'))
+    : (n===0 ? '写真の上を指でタップして、範囲の角を順番に囲んでください'
+             : '続けてタップして角を足してください。指を動かせば拡大・移動もできます');
   roiUndoBtn.disabled = n===0;
   roiFinishBtn.disabled = n<3;
   fitTopBar();          // 説明文が変わると帯の高さも変わる
