@@ -81,6 +81,13 @@
     display:flex;align-items:center;gap:8px;z-index:5;}
   #calcBtn,#camBtn{background:rgba(30,22,16,.86);border:1px solid var(--line);
     color:var(--sawn);border-radius:12px;padding:9px;line-height:0;backdrop-filter:blur(6px);}
+  /* 向きの切り替え。押すと「横」⇄「縦」が入れ替わる */
+  #rotate{background:rgba(30,22,16,.86);border:1px solid var(--line);color:var(--sawn);
+    border-radius:12px;width:44px;height:44px;backdrop-filter:blur(6px);
+    display:flex;align-items:center;justify-content:center;gap:0;}
+  #rotate b{font-size:17px;font-weight:800;line-height:1;}
+  #rotate:active{background:#3A2C1F;}
+  #rotate.on{border-color:var(--paint);color:var(--paint);}
   #calcBtn svg,#camBtn svg{width:26px;height:26px;display:block;}
   #calcBtn:active,#camBtn:active{background:#3A2C1F;}
   #calcBtn.on{border-color:var(--paint);color:var(--paint);background:#3A2C1F;}
@@ -128,6 +135,7 @@
     border-radius:12px;padding:9px 2px 8px;font-size:11px;line-height:1.3;font-weight:600;}
   #bar button:active{background:#3A2C1F;}
   #bar button i{display:block;font-size:18px;font-style:normal;margin-bottom:1px;}
+  #bar button i svg{width:20px;height:20px;display:block;margin:0 auto;}
 
   #morePanel{position:fixed;left:8px;right:8px;bottom:150px;
     background:rgba(38,30,22,.97);border:1px solid var(--line);border-radius:16px;
@@ -263,8 +271,8 @@
 <div id="count" class="hide"><b id="num">0</b><span>本</span><span id="countBreak" class="hide"></span></div>
 
 <div id="topRight">
-  <!-- 横向きの間だけ出す。戻し方が分からなくならないよう常に見える場所に置く -->
-  <button id="backPortrait" class="hide" aria-label="縦向きに戻す">⟲縦</button>
+  <!-- 向きの切り替え。すぐ押せるようカメラの横に置く。押すと切り替わる -->
+  <button id="rotate" aria-label="画面の向きを変える"><b id="rotFace">横</b></button>
   <button id="camBtn" aria-label="写真を撮って数える">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
       <path d="M3 8.5h3.2l1.5-2.4h8.6l1.5 2.4H21v11H3z" stroke-linecap="round"/>
@@ -325,16 +333,16 @@
   <button id="pick"><i>🖼</i>写真</button>
   <button id="auto"><i>🤖</i>自動</button>
   <button id="undo"><i>↩</i>戻す</button>
-  <button id="erase"><i>🧽</i>消す</button>
+  <button id="erase"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">
+    <path d="M8.6 20.5 3.5 15.4a1.6 1.6 0 0 1 0-2.3L12.9 3.7a1.6 1.6 0 0 1 2.3 0l5.1 5.1a1.6 1.6 0 0 1 0 2.3l-9.4 9.4z"/>
+    <path d="M7.6 8.9 15.1 16.4"/><path d="M8.6 20.5H21"/></svg></i>消す</button>
   <button id="save"><i>⬇</i>保存</button>
   <button id="more"><i>⋯</i>その他</button>
 </div>
 
 <div id="morePanel" class="hide">
   <div class="grab" aria-label="つまんで下げると閉じます"></div>
-  <div class="row" style="gap:8px">
-    <button id="rotate" class="act ghost2"><i>🔄</i>横向きで見る</button>
-  </div>
   <div class="row" style="gap:8px">
     <button id="fit" class="act ghost2"><i>⤢</i>全体を表示</button>
     <button id="look" class="act ghost2"><i>🎨</i>見た目</button>
@@ -435,7 +443,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v46';
+const APP_VER='v47';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -901,19 +909,21 @@ function dropFitBack(){
 
    写真そのものやAIに渡す向きは変えない(学習は正しい向きで行っているため)。 */
 const appEl=document.getElementById('app'), rotBtn=document.getElementById('rotate');
-const backBtn=document.getElementById('backPortrait');
-let land=false;                                  // 横向きで見ているか
+const rotFace=document.getElementById('rotFace');
+let land=false;                                  // 画面ぜんぶを回して横向きにしているか
 
-/* いま横向きで見えているか。
-   端末そのものが横になっている場合と、こちらで回している場合の両方を含む。 */
+/* いま横向きで見えているか。端末が横になっている場合も含む。 */
 function isLand(){ return land || innerWidth > innerHeight; }
-/* ボタンの文字は**いまの向き**で決める。
-   端末が横になっている時に「横向きで見る」と出ていて、切り替えられなかった。 */
+
+/* ボタンの表示は「押したらこうなる」方。
+   縦で見ている時は「横」、横で見ている時は「縦」。 */
 function labelRot(){
   const L=isLand();
-  rotBtn.innerHTML = L ? '<i>🔄</i>縦向きにする' : '<i>🔄</i>横向きにする';
-  backBtn.classList.toggle('hide', !L);
+  rotFace.textContent = L ? '縦' : '横';
+  rotBtn.classList.toggle('on', L);
+  rotBtn.setAttribute('aria-label', L ? '縦向きにする' : '横向きにする');
 }
+
 function applyLand(){
   if(land){
     // 端末のURLバーで 100vh がずれるので、実寸を入れる
@@ -924,55 +934,43 @@ function applyLand(){
     appEl.style.width=''; appEl.style.height=''; appEl.style.transform='';
   }
   document.body.classList.toggle('landscape', land);
+  shortScreen();          // パネルを薄くする判定は、回した直後にすぐ効かせる
   labelRot();
 }
+
 /* 指の位置を、回した後の画面の座標に直す。
    画面ぜんぶを回しているので、指の座標(clientX/Y)はそのままでは使えない。 */
 function appPt(e){
   return land ? {x:e.clientY, y:innerWidth-e.clientX} : {x:e.clientX, y:e.clientY};
 }
+
 function setLand(on){
-  if(land===on) return;
+  if(land===on){ labelRot(); return; }
   land=on;
   applyLand();
-  requestAnimationFrame(()=>{
-    shortScreen(); resize(); fitView(); placePanels();
-  });
+  // その場で計算し直す。描画待ち(requestAnimationFrame)に入れると、
+  // キャンバスの新しい大きさが確定する前に走ってしまい、縦の時の倍率が残る
+  void cv.offsetWidth;          // 並びを確定させる
+  resize(); fitView(); placePanels();
 }
-/* 縦に戻す。端末を横に固定していたらそれも解く。 */
-async function goPortrait(){
-  if(land) setLand(false);
-  try{ if(screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); }catch(e){}
-  try{
-    if(screen.orientation && screen.orientation.lock && innerWidth>innerHeight){
-      await screen.orientation.lock('portrait');
-    }
-  }catch(e){}
-  try{ if(document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen(); }catch(e){}
-  labelRot();
-}
-rotBtn.onclick=async()=>{
+
+/* 向きの切り替え。
+
+   **全画面＋端末の向きの固定は使わない。**
+   その方式だと、画像や学習データを保存した時にダウンロードで全画面が解除され、
+   一緒に向きの固定も外れて勝手に縦へ戻ってしまう(2026-09-19に指摘を受けた)。
+   画面ぜんぶを回すやり方なら、保存しても何をしても向きは変わらない。 */
+rotBtn.onclick=()=>{
   closeMore();
-  if(isLand()){ await goPortrait(); flash('縦向きにしました', 2500); return; }
-  // ① 端末ごと横にできるならそれが一番きれい（Androidのブラウザは全画面なら効く）
-  try{
-    if(screen.orientation && screen.orientation.lock){
-      if(!document.fullscreenElement && document.documentElement.requestFullscreen){
-        await document.documentElement.requestFullscreen();
-      }
-      await screen.orientation.lock('landscape');
-      flash('横向きにしました', 3000);
-      return;
-    }
-  }catch(e){ /* 使えない端末はここに来る。②へ */ }
-  // すでに画面が横長なら、回す必要がない（回すと縦に戻ってしまう）
-  if(innerWidth > innerHeight){ flash('すでに横向きです', 2500); return; }
-  // ② 端末を回せない時は、画面ぜんぶを回す
+  if(land){ setLand(false); flash('縦向きにしました', 2000); return; }
+  if(innerWidth > innerHeight){
+    // 端末そのものが横になっている。こちらで回すと逆に縦になってしまう
+    flash('端末がすでに横向きです。縦にするには端末を戻してください', 3500);
+    labelRot(); return;
+  }
   setLand(true);
-  flash('<b>端末を横に傾けて</b>ご覧ください。戻すには右上の「縦」を押します', 6000);
+  flash('<b>端末を横に傾けて</b>ご覧ください。右上の「縦」で戻せます', 5000);
 };
-/* 戻し方が分からないと困るので、横向きの間は常に「縦」ボタンを出しておく */
-backBtn.onclick=()=>{ goPortrait(); };
 applyLand(); shortScreen();
 
 document.getElementById('fit').onclick=()=>{
