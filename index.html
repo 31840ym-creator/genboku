@@ -40,8 +40,9 @@
      こうすると両方が同じ帯に収まり、写真の見える高さが1段分ぶん増える。 */
   body.short #bar{justify-content:flex-end;gap:6px;
     background:linear-gradient(to top,rgba(30,22,16,.55),rgba(30,22,16,0));}
-  body.short #bar button{flex:0 0 auto;width:62px;
+  body.short #bar button{flex:0 0 auto;width:54px;padding:7px 2px 6px;font-size:10px;
     background:rgba(38,30,22,.94);backdrop-filter:blur(6px);}
+  body.short #bar button i{font-size:16px;}
   /* パネルは左下。幅は「ボタンの手前まで」に収める(--panelmax はJSが実測して入れる) */
   body.short #autoPanel, body.short #savePanel, body.short #morePanel,
   body.short #panel, body.short #setPanel, body.short #statusPanel,
@@ -70,8 +71,9 @@
      文字を入れると幅を取り合って折り返し、パネルが分厚くなっていた(2026-09-19) */
   body.short #autoPanel{display:flex;align-items:center;gap:8px;width:auto;}
   body.short #autoMsg{display:none;}
-  body.short #autoPanel .row{margin:0;flex:0 0 auto;width:auto;}
-  body.short #autoPanel .row+.row{margin:0;}
+  /* .row の入れ子をなくし、ボタンをパネル直下の並びにする。
+     入れ子のままだと行ごとに高さが決まり、数pxずれる(2026-09-19) */
+  body.short #autoPanel .row{display:contents;}
   /* 「数える」と「範囲を囲う」は同じ大きさ。
      枠のある・なしで高さがずれないよう box-sizing と height を明示する */
   body.short #autoPanel #redo,
@@ -106,7 +108,7 @@
      文字を入れるとボタンと幅を取り合って切れたり折り返したりした(2026-09-19) */
   body.short #roiMsg{display:none;}
   body.short #roiCount{margin:0;flex:0 0 auto;font-size:13px;font-weight:700;min-width:3.5em;}
-  body.short #roiBanner .row{margin:0;flex:0 0 auto;}
+  body.short #roiBanner .row{display:contents;}
   body.short #roiBanner .act{width:auto;min-width:76px;height:36px;padding:0 10px;
     font-size:12px;line-height:1;box-sizing:border-box;flex:none;
     display:flex;align-items:center;justify-content:center;}
@@ -588,7 +590,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v64';
+const APP_VER='v65';
 document.getElementById('ver').textContent=APP_VER;
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
