@@ -70,16 +70,16 @@
      電卓そのものを画面いっぱいに広げはしない(最大640px・中央)。 */
   body.short #calcPanel{
     display:grid;
-    grid-template-columns:1fr 204px;
+    grid-template-columns:minmax(0,1fr) 204px;   /* 長い式で押し広げられないように */
     grid-template-rows:auto auto auto 1fr;
     column-gap:14px;
     max-width:640px;
     padding:6px 12px 10px;
   }
   body.short #calcPanel .grab{grid-column:1 / -1; grid-row:1; margin-bottom:2px;}
-  body.short #calcTop {grid-column:1; grid-row:2; align-self:start;}
-  body.short #calcDisp{grid-column:1; grid-row:3;}
-  body.short #calcHist{grid-column:1; grid-row:4;}
+  body.short #calcTop {grid-column:1; grid-row:2; align-self:start; min-width:0;}
+  body.short #calcDisp{grid-column:1; grid-row:3; min-width:0;}
+  body.short #calcHist{grid-column:1; grid-row:4; min-width:0;}
   body.short #calcKeys{grid-column:2; grid-row:2 / 5; align-self:stretch;}
   body.short #calcHistBtn{padding:6px 12px;font-size:12px;}
   body.short #calcExpr{font-size:22px;min-height:28px;}
@@ -246,7 +246,7 @@
   #calcHistBtn{flex:none;background:#161616;color:#9A9A9A;
     border:1px solid #333;border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;}
   #calcHistBtn.on{color:var(--calc-op);border-color:var(--calc-op);}
-  #calcExpr{flex:1;text-align:right;font-size:26px;font-weight:700;color:#FFF;
+  #calcExpr{flex:1;min-width:0;text-align:right;font-size:26px;font-weight:700;color:#FFF;
     min-height:36px;letter-spacing:-.01em;
     font-variant-numeric:tabular-nums;white-space:nowrap;
     overflow-x:auto;scrollbar-width:none;}
@@ -261,7 +261,7 @@
   #calcHist .empty{color:#8C8C8C;font-size:14px;text-align:center;padding:26px 0;}
   #calcHist .clear{background:none;border:1px dashed #444;color:#9A9A9A;
     border-radius:10px;padding:11px 4px;font-size:13px;}
-  #calcDisp{text-align:right;font-size:20px;font-weight:600;color:#8C8C8C;
+  #calcDisp{min-width:0;text-align:right;font-size:20px;font-weight:600;color:#8C8C8C;
     letter-spacing:0;font-variant-numeric:tabular-nums;margin:2px 0 12px;
     min-height:30px;overflow:hidden;white-space:nowrap;}
   #calcDisp.answer{font-size:46px;font-weight:800;color:#FFF;letter-spacing:-.02em;
@@ -505,7 +505,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v51';
+const APP_VER='v52';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
