@@ -122,10 +122,12 @@
   #calcBtn,#camBtn{background:rgba(30,22,16,.86);border:1px solid var(--line);
     color:var(--sawn);border-radius:12px;padding:9px;line-height:0;backdrop-filter:blur(6px);}
   /* 向きの切り替え。押すと「横」⇄「縦」が入れ替わる */
-  #rotate{background:rgba(30,22,16,.86);border:1px solid var(--line);color:var(--sawn);
-    border-radius:12px;width:44px;height:44px;backdrop-filter:blur(6px);
-    display:flex;align-items:center;justify-content:center;gap:0;}
-  #rotate b{font-size:17px;font-weight:800;line-height:1;}
+  #rotate{position:relative;background:rgba(30,22,16,.86);border:1px solid var(--line);
+    color:var(--sawn);border-radius:12px;width:44px;height:44px;backdrop-filter:blur(6px);
+    display:flex;align-items:center;justify-content:center;gap:0;padding:0;}
+  #rotate svg{position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);
+    opacity:.85;pointer-events:none;}
+  #rotate b{position:relative;font-size:15px;font-weight:800;line-height:1;}
   #rotate:active{background:#3A2C1F;}
   #rotate.on{border-color:var(--paint);color:var(--paint);}
   #calcBtn svg,#camBtn svg{width:26px;height:26px;display:block;}
@@ -321,7 +323,18 @@
 
 <div id="topRight">
   <!-- 向きの切り替え。すぐ押せるようカメラの横に置く。押すと切り替わる -->
-  <button id="rotate" aria-label="画面の向きを変える"><b id="rotFace">横</b></button>
+  <button id="rotate" aria-label="画面の向きを変える">
+    <svg viewBox="0 0 40 40" aria-hidden="true">
+      <!-- ぐるっと回る矢印。中の字(縦/横)が「押したらこうなる」向き -->
+      <path d="M 6.21 17.57 A 14 14 0 0 1 33.79 17.57" fill="none" stroke="currentColor"
+            stroke-width="2.3" stroke-linecap="round"/>
+      <path d="M 34.05 19.05 L 30.22 14.64 L 36.14 13.60 Z" fill="currentColor"/>
+      <path d="M 33.79 22.43 A 14 14 0 0 1 6.21 22.43" fill="none" stroke="currentColor"
+            stroke-width="2.3" stroke-linecap="round"/>
+      <path d="M 5.95 20.95 L 9.78 25.36 L 3.86 26.40 Z" fill="currentColor"/>
+    </svg>
+    <b id="rotFace">横</b>
+  </button>
   <button id="camBtn" aria-label="写真を撮って数える">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
       <path d="M3 8.5h3.2l1.5-2.4h8.6l1.5 2.4H21v11H3z" stroke-linecap="round"/>
@@ -505,7 +518,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v53';
+const APP_VER='v54';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
