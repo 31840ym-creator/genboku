@@ -33,9 +33,9 @@
      写真がほとんど見えなかった(2026-09-17)。
      文字を1行に詰め、ボタンを横に並べ、余白を削る。 */
   body.short #autoPanel, body.short #savePanel, body.short #morePanel,
-  body.short #panel, body.short #setPanel{padding:8px 12px 10px;border-radius:14px;}
+  body.short #panel, body.short #setPanel, body.short #statusPanel{padding:8px 12px 10px;border-radius:14px;}
   body.short #autoPanel .grab, body.short #savePanel .grab, body.short #morePanel .grab,
-  body.short #panel .grab, body.short #setPanel .grab{margin-bottom:4px;}
+  body.short #panel .grab, body.short #setPanel .grab, body.short #statusPanel .grab{margin-bottom:4px;}
   /* 案内文とボタンを1行にまとめる */
   body.short #autoPanel{display:flex;align-items:center;gap:10px;}
   body.short #autoPanel .grab{position:absolute;left:50%;transform:translateX(-50%);top:4px;margin:0;}
@@ -104,6 +104,9 @@
   #ver.on{border-color:var(--paint);}
 
   /* 設定。版バッジを押すと開く */
+  #statusPanel{position:fixed;left:8px;right:8px;bottom:150px;
+    background:rgba(38,30,22,.97);border:1px solid var(--line);border-radius:16px;
+    padding:10px 16px 12px;backdrop-filter:blur(8px);overflow-y:auto;}
   #setPanel{position:fixed;left:8px;right:8px;bottom:150px;
     background:rgba(38,30,22,.97);border:1px solid var(--line);border-radius:16px;
     padding:14px 16px 16px;backdrop-filter:blur(8px);overflow-y:auto;}
@@ -349,6 +352,7 @@
   </div>
   <div class="row" style="gap:8px">
     <button id="clear" class="act ghost2"><i>✕</i>印を全部消す</button>
+    <button id="openSet" class="act ghost2"><i>⚙</i>設定</button>
   </div>
 </div>
 
@@ -386,12 +390,18 @@
   <button id="roiRedo" class="act ghost">やり直す</button>
 </div>
 
-<div id="setPanel" class="hide">
+<!-- 版バッジを押した時。いまの状態だけを出す(2026-09-19) -->
+<div id="statusPanel" class="hide">
   <div class="grab" aria-label="つまんで下げると閉じます"></div>
-  <div class="setHead">設定</div>
   <div class="setRow"><span>アプリの版</span><b id="setVer">-</b></div>
   <div class="setRow"><span>AI</span><b id="setAI">-</b></div>
   <div class="setRow"><span>数え方</span><b id="setConf">-</b></div>
+</div>
+
+<!-- 設定。「その他」から開く -->
+<div id="setPanel" class="hide">
+  <div class="grab" aria-label="つまんで下げると閉じます"></div>
+  <div class="setHead">設定</div>
   <div id="setLegal"></div>
   <button id="setReset" class="sub">うまく動かない時：保存庫を作り直す</button>
 </div>
@@ -443,7 +453,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v47';
+const APP_VER='v48';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -1014,7 +1024,7 @@ function loadPref(){
 const lookBtn=document.getElementById('look');
 function closeLook(){ panel.classList.add('hide'); lookBtn.classList.remove('on'); }
 /* パネルは同じ場所に出るので、1枚だけ開くようにする */
-function closePanels(){ closeAuto(); closeSave(); closeCalc(); closeLook(); closeSet(); closeMore(); showRoiGo(false); }
+function closePanels(){ closeAuto(); closeSave(); closeCalc(); closeLook(); closeSet(); closeStatus(); closeMore(); showRoiGo(false); }
 lookBtn.onclick=()=>{
   if(!panel.classList.contains('hide')){ closeLook(); return; }
   closePanels();
@@ -1357,6 +1367,7 @@ function placePanels(){
   const b=bar.offsetHeight+8;
   autoPanel.style.bottom=b+'px'; panel.style.bottom=b+'px'; hint.style.bottom=(b+6)+'px';
   calcPanel.style.bottom=b+'px'; roiGo.style.bottom=b+'px'; morePanel.style.bottom=b+'px';
+  statusPanel.style.bottom=b+'px';
   fitTopBar();
   /* 画面の低い端末だと、パネルが本数バッジや右上のボタンに被る。
      上に置いてあるものの下から、下のバーまでの高さに収める。 */
@@ -1365,7 +1376,7 @@ function placePanels(){
     countBox.getBoundingClientRect().bottom) + 8;
   // 横向きに回している時、使える高さは画面の「幅」の方
   const room=Math.max(200, (land?innerWidth:innerHeight) - b - topEnd);
-  for(const el of [calcPanel, autoPanel, savePanel, panel, setPanel, morePanel]) el.style.maxHeight=room+'px';
+  for(const el of [calcPanel, autoPanel, savePanel, panel, setPanel, morePanel, statusPanel]) el.style.maxHeight=room+'px';
   setPanel.style.bottom=b+'px';
 }
 guess.addEventListener('input',()=>{ guessVal.textContent=guess.value+'本'; });
@@ -1718,7 +1729,7 @@ const CONTACT_MAIL='';        // 例 'genboku@example.com'
 const setPanel=document.getElementById('setPanel');
 const verBtn=document.getElementById('ver');
 
-function closeSet(){ setPanel.classList.add('hide'); verBtn.classList.remove('on'); }
+function closeSet(){ setPanel.classList.add('hide'); }
 
 function drawLegal(){
   const box=document.getElementById('setLegal');
@@ -1738,16 +1749,28 @@ function drawLegal(){
   }
 }
 
+/* 版バッジ。**いまの状態だけ**を出す。
+   規約類や「保存庫を作り直す」は「その他 → 設定」へ移した(2026-09-19)。 */
+const statusPanel=document.getElementById('statusPanel');
+function closeStatus(){ statusPanel.classList.add('hide'); verBtn.classList.remove('on'); }
 verBtn.onclick=()=>{
-  if(!setPanel.classList.contains('hide')){ closeSet(); return; }
+  if(!statusPanel.classList.contains('hide')){ closeStatus(); return; }
   closePanels();
   document.getElementById('setVer').textContent=APP_VER;
   document.getElementById('setAI').textContent =
     aiReady ? '使えます' : (aiTried ? '使えません' : 'まだ読み込んでいません');
   document.getElementById('setConf').textContent = aiReady ? 'AIで数える' : '写真の明るさで数える';
+  statusPanel.classList.remove('hide');
+  verBtn.classList.add('on');
+  placePanels();
+};
+/* 設定は「その他」から */
+document.getElementById('openSet').onclick=()=>{
+  closeMore();
+  if(!setPanel.classList.contains('hide')){ closeSet(); return; }
+  closePanels();
   drawLegal();
   setPanel.classList.remove('hide');
-  verBtn.classList.add('on');
   placePanels();
 };
 
@@ -1984,6 +2007,7 @@ bindGrab(panel, closeLook);
 bindGrab(calcPanel, closeCalc);
 bindGrab(setPanel, closeSet);
 bindGrab(morePanel, closeMore);
+bindGrab(statusPanel, closeStatus);
 
 /* 前回の見た目を読み込んで、画面に反映する。
    ボタンや入力欄を作り終えた後でないと反映できないので、ここで行う。 */
