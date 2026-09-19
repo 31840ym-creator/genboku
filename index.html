@@ -50,6 +50,14 @@
     left:8px;right:auto;width:auto;max-width:var(--panelmax,60%);}
   /* 帯も浮いた箱になるので角を丸める */
   body.short #roiBanner, body.short #eraseBanner{border-radius:13px;}
+  /* 数え終わりなどの知らせも、他のパネルと同じ左下に置く。
+     真ん中に出すと写真に重なり、縦に3行で分厚くなっていた(2026-09-20) */
+  body.short #hint{left:8px;right:auto;width:auto;max-width:var(--panelmax,60%);
+    text-align:left;padding:0;}
+  body.short #hint span{max-width:100%;}
+  body.short #hint span.multi{display:flex;align-items:center;gap:10px;padding:7px 14px;}
+  body.short #hint i{margin:0;padding:0 0 0 10px;border-top:none;
+    border-left:1px solid var(--line);}
   /* 消すモードは「いま触ると消える」という大事な合図なので、
      横向きでも小さくしない。はっきり大きく出す(2026-09-20) */
   body.short #eraseBanner{padding:13px 20px;font-size:18px;letter-spacing:.06em;
@@ -292,8 +300,10 @@
   .sub:active{color:#00C6FF;border-color:#2A5A6B;}
   .act.ghost2{background:var(--bark-2);color:#00C6FF;border:1px solid #2A5A6B;}
   #guessVal{width:46px;text-align:right;font-size:12px;color:var(--sawn-dim);}
-  #bar button.on{border-color:var(--paint);color:var(--paint);}
-  #bar button.erasing{background:#7A1D12;border-color:#FF6B4A;color:#FFD9CF;}
+  /* 押している最中の見せ方は全部のボタンで同じにする。
+     消すモードだけ塗りつぶしていて浮いていた(2026-09-20)。
+     いま消せる状態かは、写真の下に出る赤い帯で分かる */
+  #bar button.on,#bar button.erasing{border-color:var(--paint);color:var(--paint);}
   /* 案内の帯は**写真の下**に出す。以前は画面の上に固定していたが、
      「この範囲に決定」が指から遠く、写真の上の方も隠していた(2026-09-17に移動)。
      下のバーのすぐ上に置く。位置は placePanels() が合わせる。 */
@@ -606,7 +616,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v67';
+const APP_VER='v68';
 document.getElementById('ver').textContent=APP_VER;
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -1553,7 +1563,7 @@ function placePanels(){
   for(const el of [autoPanel, panel, roiGo, morePanel, statusPanel, savePanel, setPanel])
     el.style.bottom = panelBottom+'px';
   calcPanel.style.bottom = b+'px';           // 電卓は真ん中なのでバーの上
-  hint.style.bottom = (b+6)+'px';
+  hint.style.bottom = (short ? panelBottom : b+6)+'px';   // 横向きは左下の空きへ
 
   fitTopRight();
   fitTopBar();
