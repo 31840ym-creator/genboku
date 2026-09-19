@@ -362,7 +362,7 @@
   </div>
   <div class="row">
     <span class="lab">大きさ</span>
-    <input type="range" id="size" min="5" max="16" step="1" value="10">
+    <input type="range" id="size" min="25" max="100" step="5" value="100">
     <span id="preview"></span>
   </div>
   <div class="row">
@@ -505,7 +505,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v52';
+const APP_VER='v53';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -707,7 +707,7 @@ function measureSpan(){
 /* 画面に描く時の印の半径。木口に合わせ、「大きさ」の調整を掛ける。 */
 function markRadius(){
   const base = logSpan>0 ? logSpan*view.s*0.45 : 11;
-  return Math.max(3, Math.min(40, base*markScale));
+  return Math.max(2, Math.min(40, base*markScale));
 }
 function updateCount(){
   numEl.textContent=marks.length;
@@ -1066,7 +1066,8 @@ function loadPref(){
   try{ d=JSON.parse(localStorage.getItem(PREF_KEY)||'{}'); }catch(e){ return; }
   if(COLORS.includes(d.color)) markColor=d.color;
   // 以前の版の size(画素そのもの)は読まない。いまは倍率で持つ
-  if(typeof d.scale==='number' && d.scale>=0.5 && d.scale<=1.6) markScale=d.scale;
+  // 以前の版は0.5〜1.6だった。範囲を外れた値は採用せず既定に戻す
+  if(typeof d.scale==='number' && d.scale>=0.25 && d.scale<=1.0) markScale=d.scale;
   if(typeof d.nums==='boolean') showNums=d.nums;
   if(typeof d.snd==='boolean') soundOn=d.snd;
   // 以前の版で保存された d.conf は読まない（厳しさは0.25に固定したため）
@@ -1096,11 +1097,11 @@ COLORS.forEach(c=>{
 });
 const sizeInput=document.getElementById('size'), preview=document.getElementById('preview');
 function drawPreview(){
-  const d=Math.round(18*markScale);   // 見本。実際の大きさは木口に合わせて決まる
+  const d=Math.max(5, Math.round(20*markScale));   // 見本。実際の大きさは木口に合わせて決まる
   preview.innerHTML=`<span style="display:block;width:${d}px;height:${d}px;border-radius:50%;
     background:${rgba(markColor,.42)};border:2px solid ${markColor}"></span>`;
 }
-sizeInput.addEventListener('input',()=>{ markScale=+sizeInput.value/10; drawPreview(); draw(); });
+sizeInput.addEventListener('input',()=>{ markScale=+sizeInput.value/100; drawPreview(); draw(); });
 sizeInput.addEventListener('change',savePref);   // 動かし終わった時だけ保存する
 const togNum=document.getElementById('togNum');
 togNum.onclick=()=>{
@@ -2074,7 +2075,7 @@ loadPref();
   [...swWrap.children].forEach(b=>
     b.setAttribute('aria-pressed', b.style.background===markColor || rgbToHex(b.style.background)===markColor));
   numEl.style.color=markColor;
-  sizeInput.value=Math.round(markScale*10); drawPreview();
+  sizeInput.value=Math.round(markScale*100); drawPreview();
   togNum.classList.toggle('on',showNums);
   togNum.textContent=showNums?'番号を表示する':'番号を表示しない';
   togSnd.classList.toggle('on',soundOn);
