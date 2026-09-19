@@ -575,7 +575,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v60';
+const APP_VER='v61';
 document.getElementById('ver').textContent=APP_VER;
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -1523,13 +1523,19 @@ function placePanels(){
   const below=el=>el.offsetTop+el.offsetHeight;
   const topEnd=Math.max(below(document.getElementById('topRight')), below(countBox)) + 8;
   // 横向きに回している時、使える高さは画面の「幅」の方
-  const room=Math.max(200, (land?innerWidth:innerHeight) - panelBottom - topEnd);
-  for(const el of [calcPanel, autoPanel, savePanel, panel, setPanel, morePanel, statusPanel])
+  const appH = land ? innerWidth : innerHeight;
+  const room=Math.max(200, appH - panelBottom - topEnd);
+  for(const el of [autoPanel, savePanel, panel, setPanel, morePanel, statusPanel])
     el.style.maxHeight=room+'px';
-  /* 横向きの電卓は、キーの段を画面の高さいっぱいに広げる。
+  /* 電卓だけは（真ん中に出すので）バーの上に置いている。
+     入る高さもその分だけ低い。ここを他と同じ値にしていたため、
+     電卓の上端が右上のボタンに被っていた(2026-09-19に修正)。 */
+  const roomCalc=Math.max(180, appH - b - topEnd);
+  calcPanel.style.maxHeight=roomCalc+'px';
+  /* 横向きの電卓は、キーの段を入る高さいっぱいに広げる。
      そうしないと左側(式や履歴)の高さに引っ張られ、キーが横に長く潰れる。 */
   const kb=document.getElementById('calcKeys');
-  if(kb) kb.style.minHeight = short ? Math.max(120, room-b-48)+'px' : '';
+  if(kb) kb.style.minHeight = short ? Math.max(110, roomCalc-46)+'px' : '';
 }
 guess.addEventListener('input',()=>{ guessVal.textContent=guess.value+'本'; });
 
