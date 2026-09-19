@@ -59,19 +59,36 @@
   body.short #roiBanner .act.ghost{flex:0 0 auto;}
 
   /* ---- 横向きの電卓 ----
-     高さが足りずキーが潰れて数字が切れていた(中身290px / 入る高さ242px)。
-     横長に広げる必要は無いので、**幅はそのまま**(420px・中央)にして
-     縦の詰まりだけを解く。文字と余白を小さくして5段が収まるようにする。 */
-  body.short #calcPanel{padding:6px 10px 8px;overflow-x:hidden;}
-  body.short #calcTop{gap:8px;}
-  body.short #calcHistBtn{padding:5px 10px;font-size:12px;}
-  body.short #calcExpr{font-size:19px;min-height:24px;}
-  body.short #calcDisp{font-size:14px;min-height:18px;margin:1px 0 6px;}
-  body.short #calcDisp.answer{font-size:28px;}
-  body.short #calcKeys{gap:5px;}
-  body.short .ck{padding:5px 2px;font-size:17px;border-radius:9px;}
-  body.short .ck.fn{font-size:14px;}
-  body.short #calcHist{max-height:120px;}
+
+     縦向きと同じ「上から下へ」の並びのままだと、高さが足りず
+     キーが横に長く潰れる(幅100px × 高さ32px のような形になっていた)。
+
+     横向きは**横に広い**ので、並びを変える:
+       左 … 履歴ボタン・式・答え・履歴
+       右 … キー(4列5段)を縦いっぱいに
+     こうするとキーが正方形に近くなり、押しやすくなる。
+     電卓そのものを画面いっぱいに広げはしない(最大640px・中央)。 */
+  body.short #calcPanel{
+    display:grid;
+    grid-template-columns:1fr 204px;
+    grid-template-rows:auto auto auto 1fr;
+    column-gap:14px;
+    max-width:640px;
+    padding:6px 12px 10px;
+  }
+  body.short #calcPanel .grab{grid-column:1 / -1; grid-row:1; margin-bottom:2px;}
+  body.short #calcTop {grid-column:1; grid-row:2; align-self:start;}
+  body.short #calcDisp{grid-column:1; grid-row:3;}
+  body.short #calcHist{grid-column:1; grid-row:4;}
+  body.short #calcKeys{grid-column:2; grid-row:2 / 5; align-self:stretch;}
+  body.short #calcHistBtn{padding:6px 12px;font-size:12px;}
+  body.short #calcExpr{font-size:22px;min-height:28px;}
+  body.short #calcDisp{font-size:16px;min-height:22px;margin:4px 0 0;}
+  body.short #calcDisp.answer{font-size:34px;}
+  body.short #calcKeys{gap:6px;}
+  body.short .ck{padding:4px 2px;font-size:19px;border-radius:10px;}
+  body.short .ck.fn{font-size:16px;}
+  body.short #calcHist{max-height:none;}
   body.short #calcHist .hrow{padding:7px 10px;}
   body.short #calcHist .hrow .hr{font-size:16px;}
   body.short #calcHist .hrow .he{font-size:12px;}
@@ -488,7 +505,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v50';
+const APP_VER='v51';
 document.getElementById('ver').textContent=APP_VER+' AI';
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -1406,12 +1423,18 @@ function placePanels(){
   fitTopBar();
   /* 画面の低い端末だと、パネルが本数バッジや右上のボタンに被る。
      上に置いてあるものの下から、下のバーまでの高さに収める。 */
-  const topEnd=Math.max(
-    document.getElementById('topRight').getBoundingClientRect().bottom,
-    countBox.getBoundingClientRect().bottom) + 8;
+  /* 回している時 getBoundingClientRect は画面基準の外枠を返すので使えない。
+     並びの位置(offsetTop/offsetHeight)は回転の影響を受けないのでこちらを使う。 */
+  const below=el=>el.offsetTop+el.offsetHeight;
+  const topEnd=Math.max(below(document.getElementById('topRight')), below(countBox)) + 8;
   // 横向きに回している時、使える高さは画面の「幅」の方
   const room=Math.max(200, (land?innerWidth:innerHeight) - b - topEnd);
   for(const el of [calcPanel, autoPanel, savePanel, panel, setPanel, morePanel, statusPanel]) el.style.maxHeight=room+'px';
+  /* 横向きの電卓は、キーの段を画面の高さいっぱいに広げる。
+     そうしないと左側(式や履歴)の高さに引っ張られ、キーが横に長く潰れる。 */
+  const kb=document.getElementById('calcKeys');
+  if(kb) kb.style.minHeight = document.body.classList.contains('short')
+    ? Math.max(120, room-48)+'px' : '';
   setPanel.style.bottom=b+'px';
 }
 guess.addEventListener('input',()=>{ guessVal.textContent=guess.value+'本'; });
