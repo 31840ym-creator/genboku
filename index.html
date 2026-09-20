@@ -72,11 +72,13 @@
   body.short #autoPanel, body.short #savePanel, body.short #morePanel,
   body.short #panel, body.short #setPanel, body.short #statusPanel{
     padding:5px 12px 7px;border-radius:13px;overflow-x:hidden;}
-  /* つまみは横向きでは出さない。中身に重なって読めなくなるため。
-     パネルは同じボタンをもう一度押せば閉じられる(2026-09-19) */
+  /* 薄い帯のパネルはつまみを出さない。中身に重なって読めなくなるため。
+     同じボタンをもう一度押せば閉じられる(2026-09-19) */
   body.short #autoPanel .grab, body.short #savePanel .grab, body.short #morePanel .grab,
-  body.short #panel .grab, body.short #setPanel .grab, body.short #statusPanel .grab,
-  body.short #calcPanel .grab{display:none;}
+  body.short #statusPanel .grab, body.short #calcPanel .grab{display:none;}
+  /* 見た目と設定は縦向きと同じ並びで背が高いので、つまみを出す。
+     余白が狭いぶん、はみ出し量を padding に合わせる(2026-09-21) */
+  body.short #panel .grab, body.short #setPanel .grab{margin:-5px -12px 2px;}
   body.short .row+.row{margin-top:6px;}
   body.short .act{padding:7px 4px;font-size:12px;}
   body.short .sub{padding:7px 4px;font-size:12px;}
@@ -118,17 +120,11 @@
   body.short #morePanel .act{white-space:nowrap;}
   /* 設定も見た目と同じ大きさに揃える。押す所は40px、文字は12.5px。
      「設定」の見出しは、押したボタンの名前と同じなので横向きでは出さない */
-  body.short #setPanel{display:grid;grid-auto-flow:column;
-    grid-template-rows:repeat(3,auto);gap:8px 14px;
-    justify-content:start;align-items:center;}
-  body.short #setPanel .setHead{display:none;}
-  /* 3つのリンクを見た目パネルと同じ「1列に3つ」の並びに入れる */
-  body.short #setLegal{display:contents;}
-  body.short .setLink{border:1px solid var(--line);border-radius:10px;
-    padding:0 12px;min-height:40px;font-size:12.5px;white-space:nowrap;}
-  body.short .setLink::after{font-size:13px;margin-left:10px;}
-  body.short #setPanel #setReset{margin:0;min-height:40px;font-size:12.5px;
-    white-space:normal;line-height:1.4;padding:8px 12px;max-width:190px;}
+  /* 設定も縦向きと同じ並び(見出し → 規約3つ → 保存庫を作り直す)。
+     押す所の高さだけ 40px を下限にしておく */
+  body.short #setPanel .setHead{margin-bottom:4px;font-size:12px;}
+  body.short .setLink{padding:0 2px;min-height:40px;font-size:12.5px;}
+  body.short #setPanel #setReset{margin-top:8px;min-height:40px;font-size:12.5px;}
   body.short .setRow{padding:5px 0;font-size:12px;}
 
   /* 範囲を囲う時の帯。1行にまとめる */
@@ -143,26 +139,16 @@
     display:flex;align-items:center;justify-content:center;}
   body.short #roiBanner .act.ghost{flex:0 0 auto;}
 
-  /* 見た目パネル。横向きは**2列**に分けて、5つの行を一度に出す。
-       左 … 色 / 大きさ / 合わせ方
-       右 … 番号 / 音
-     1列に積むと細長くなり、つまみも小さくせざるを得なかった。
-     2列にした分、丸もボタンも大きくできる(2026-09-20)。
-     切り替えボタンはその文字自体が名前なので、左の見出しは出さない */
-  body.short #panel{display:grid;grid-template-columns:auto auto;
-    grid-template-rows:repeat(3,auto);gap:8px 14px;
-    justify-content:start;align-items:center;}
-  /* 左の列に色と大きさ、右の列に切り替えボタン3つ。
-     3つを同じ列に入れると、列の幅で自動的に同じ幅にそろう */
-  body.short #panel .row:not(.tog){grid-column:1;}
-  body.short #panel .tog{grid-column:2;}
-  body.short #panel .row{margin:0;gap:8px;}
-  body.short #panel .tog .lab{display:none;}
-  body.short .lab{width:auto;min-width:36px;font-size:12px;}
+  /* 見た目パネル。横向きも**縦向きと同じ並び**(上から 色/大きさ/合わせ方/番号/音)。
+     一時は2列に分けていたが、どこに何があるかが縦横で変わって覚え直しになる。
+     並びはそろえて、余白だけ詰めることにした(2026-09-21) */
+  body.short #panel .row{gap:10px;}
+  body.short #panel .row+.row{margin-top:8px;}
+  body.short .lab{width:52px;font-size:12px;}   /* 「合わせ方」が2行に折れない幅 */
   body.short .sw{width:30px;height:30px;}
-  body.short #swatches{gap:5px;}
-  body.short #panel input[type=range]{height:34px;width:112px;}
-  body.short #preview{width:30px;}
+  body.short #swatches{gap:8px;}
+  body.short #panel input[type=range]{height:34px;}
+  body.short #preview{width:34px;}
   /* 指で押す所は小さくしない。40px は取りこぼしが出にくい大きさ。
      色の丸もボタンなので、まるいまま残るよう外しておく */
   body.short #panel button:not(.sw){min-height:40px;padding:0 14px;font-size:12.5px;}
@@ -654,7 +640,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v72';
+const APP_VER='v73';
 document.getElementById('ver').textContent=APP_VER;
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -2244,10 +2230,13 @@ calcBtn.onclick=()=>{
 function bindGrab(panelEl, closeFn){
   const g=panelEl.querySelector('.grab');
   if(!g) return;
-  let id=null, y0=0, moved=0;
+  let id=null, x0=0, y0=0, moved=0;
+  /* 横向きは画面ごと90度回しているので、パネルの「下」は画面では「左」。
+     画面の縦だけを見ていると、横向きで引き下げられない(2026-09-21) */
+  const pulled = e => isLand() ? -(e.clientX-x0) : (e.clientY-y0);
 
   g.addEventListener('pointerdown', e=>{
-    id=e.pointerId; y0=e.clientY; moved=0;
+    id=e.pointerId; x0=e.clientX; y0=e.clientY; moved=0;
     g.classList.add('hot');
     g.setPointerCapture(id);
     e.preventDefault();
@@ -2255,7 +2244,7 @@ function bindGrab(panelEl, closeFn){
 
   g.addEventListener('pointermove', e=>{
     if(e.pointerId!==id) return;
-    moved=e.clientY-y0;
+    moved=pulled(e);
     // 下へ引いた分だけパネルも下がって、閉じる手応えが出る
     panelEl.style.transform = moved>0 ? `translateY(${moved}px)` : '';
     if(moved>70) g.classList.remove('hot');
