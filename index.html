@@ -155,36 +155,28 @@
 
   /* ---- 横向きの電卓 ----
 
-     縦向きと同じ「上から下へ」の並びのままだと、高さが足りず
-     キーが横に長く潰れる(幅100px × 高さ32px のような形になっていた)。
+     以前は「左に式・右にキー」の2列にしていた。キーは正方形になったが、
+     横に長く、縦向きと勝手が変わって使いにくいと言われた(2026-09-21)。
 
-     横向きは**横に広い**ので、並びを変える:
-       左 … 履歴ボタン・式・答え・履歴
-       右 … キー(4列5段)を縦いっぱいに
-     こうするとキーが正方形に近くなり、押しやすくなる。
-     電卓そのものを画面いっぱいに広げはしない(最大640px・中央)。 */
-  body.short #calcPanel{
-    left:8px;right:8px;margin:0 auto;
-    display:grid;
-    grid-template-columns:minmax(0,1fr) 204px;   /* 長い式で押し広げられないように */
-    grid-template-rows:auto auto auto 1fr;
-    column-gap:14px;
-    max-width:640px;
-    padding:6px 12px 10px;
-  }
-  body.short #calcPanel .grab{grid-column:1 / -1; grid-row:1; margin-bottom:2px;}
-  body.short #calcTop {grid-column:1; grid-row:2; align-self:start; min-width:0;}
-  body.short #calcDisp{grid-column:1; grid-row:3; min-width:0;}
-  body.short #calcHist{grid-column:1; grid-row:4; min-width:0;}
-  body.short #calcKeys{grid-column:2; grid-row:2 / 5; align-self:stretch;}
-  body.short #calcHistBtn{padding:6px 12px;font-size:12px;}
-  body.short #calcExpr{font-size:22px;min-height:28px;}
-  body.short #calcDisp{font-size:16px;min-height:22px;margin:4px 0 0;}
-  body.short #calcDisp.answer{font-size:34px;}
-  body.short #calcKeys{gap:6px;}
-  body.short .ck{padding:4px 2px;font-size:19px;border-radius:10px;}
+     並びは**縦向きと同じ**(上に式と答え、下に4列5段)のまま、
+     幅だけ絞って真ん中に置き、**入る高さいっぱい**に広げる。
+     高さは JS が入る分だけ入れる(placePanels)。キーは残りを
+     分け合って伸びるので、横に潰れることはない。 */
+  /* 置く場所と幅は JS が入れる(placePanels)。真ん中に寄せつつ、
+     下のバーのボタンには重ならない所まで左へ逃がす */
+  body.short #calcPanel{padding:6px 8px 8px;}
+  /* 上の余白はできるだけ削って、キーに高さを回す */
+  body.short #calcHistBtn{padding:4px 9px;font-size:11px;border-radius:8px;}
+  body.short #calcTop{gap:8px;}
+  body.short #calcExpr{font-size:19px;min-height:24px;}
+  body.short #calcDisp{font-size:13px;min-height:16px;margin:1px 0 4px;}
+  body.short #calcDisp.answer{font-size:27px;line-height:1;}
+  /* キーは残りの高さをぜんぶ使う */
+  body.short #calcKeys{gap:5px;flex:1 1 auto;min-height:0;}
+  body.short .ck{padding:2px;font-size:19px;border-radius:10px;}
   body.short .ck.fn{font-size:16px;}
-  body.short #calcHist{max-height:none;}
+  /* 履歴を出した時にキーを押し出さないよう、高さを分け合う */
+  body.short #calcHist{max-height:38%;flex:0 1 auto;min-height:0;}
   body.short #calcHist .hrow{padding:7px 10px;}
   body.short #calcHist .hrow .hr{font-size:16px;}
   body.short #calcHist .hrow .he{font-size:12px;}
@@ -640,7 +632,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v74';
+const APP_VER='v75';
 document.getElementById('ver').textContent=APP_VER;
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -1598,7 +1590,6 @@ function placePanels(){
 
   for(const el of [autoPanel, panel, roiGo, morePanel, statusPanel, savePanel, setPanel])
     el.style.bottom = panelBottom+'px';
-  calcPanel.style.bottom = b+'px';           // 電卓は真ん中なのでバーの上
   hint.style.bottom = (short ? panelBottom : b+6)+'px';   // 横向きは左下の空きへ
 
   fitTopRight();
@@ -1622,13 +1613,30 @@ function placePanels(){
   /* 入る高さをそのまま使う。以前は最低180pxを確保していたが、
      入る高さがそれより狭い時に**上のボタンへ被る**原因になっていた(2026-09-21)。
      狭い時は電卓の中を送って見てもらう。 */
-  const roomCalc=Math.max(120, appH - b - topEnd);
+  /* 横向きの電卓は、縦向きと同じ並びのまま**真ん中**に置き、
+     入る高さいっぱいに広げる。キーは残りを分け合って伸びる。
+     真ん中のままだと下のバーのボタンに重なるので、
+     重なる分だけ左へ逃がす(2026-09-21)。 */
+  if(short){
+    const W = Math.min(210, Math.max(150, panelMax));
+    const edge   = (firstBtn ? firstBtn.offsetLeft : bar.offsetWidth) - 8;  // ボタンの手前
+    const center = (bar.offsetWidth - W)/2;
+    calcPanel.style.left  = Math.round(Math.max(8, Math.min(center, edge - W)))+'px';
+    calcPanel.style.right = 'auto';
+    calcPanel.style.width = W+'px';
+    calcPanel.style.maxWidth = 'none';
+    calcPanel.style.bottom = panelBottom+'px';
+  }else{
+    calcPanel.style.left=''; calcPanel.style.right='';
+    calcPanel.style.width=''; calcPanel.style.maxWidth='';
+    calcPanel.style.bottom = b+'px';
+  }
+  const calcBottom = short ? panelBottom : b;
+  const roomCalc=Math.max(120, appH - calcBottom - topEnd);
   calcPanel.style.maxHeight=roomCalc+'px';
-  /* 横向きの電卓は、キーの段を入る高さいっぱいに広げる。
-     そうしないと左側(式や履歴)の高さに引っ張られ、キーが横に長く潰れる。
-     ここも入る高さを超えないようにする。 */
+  calcPanel.style.height = short ? roomCalc+'px' : '';
   const kb=document.getElementById('calcKeys');
-  if(kb) kb.style.minHeight = short ? Math.max(100, roomCalc-46)+'px' : '';
+  if(kb) kb.style.minHeight='';
 }
 guess.addEventListener('input',()=>{ guessVal.textContent=guess.value+'本'; });
 
