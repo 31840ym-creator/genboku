@@ -149,9 +149,13 @@
      1列に積むと細長くなり、つまみも小さくせざるを得なかった。
      2列にした分、丸もボタンも大きくできる(2026-09-20)。
      切り替えボタンはその文字自体が名前なので、左の見出しは出さない */
-  body.short #panel{display:grid;grid-auto-flow:column;
+  body.short #panel{display:grid;grid-template-columns:auto auto;
     grid-template-rows:repeat(3,auto);gap:8px 14px;
     justify-content:start;align-items:center;}
+  /* 左の列に色と大きさ、右の列に切り替えボタン3つ。
+     3つを同じ列に入れると、列の幅で自動的に同じ幅にそろう */
+  body.short #panel .row:not(.tog){grid-column:1;}
+  body.short #panel .tog{grid-column:2;}
   body.short #panel .row{margin:0;gap:8px;}
   body.short #panel .tog .lab{display:none;}
   body.short .lab{width:auto;min-width:36px;font-size:12px;}
@@ -279,6 +283,15 @@
   #empty p{margin:0;font-size:14px;line-height:1.8;color:var(--sawn-dim);}
   .big{background:var(--paint);color:var(--paint-ink);border:none;border-radius:999px;
     font-size:17px;font-weight:700;padding:16px 30px;}
+
+  /* 重なりの順番。横向きではパネルが下のバーと同じ帯に並ぶため、
+     バーが手前にあるとパネルの下の方を押しても**バーに吸われて反応しない**。
+     「木口に合わせる」が押せなかったのはこれ(2026-09-20)。
+       3 バー < 4 パネル類 < 5 右上のボタン < 9 読み込み中の幕 */
+  #bar{z-index:3;}
+  #panel,#autoPanel,#savePanel,#morePanel,#setPanel,#statusPanel,
+  #roiGo,#roiBanner,#eraseBanner,#calcPanel,#hint{z-index:4;}
+  #busy{z-index:9;}
 
   #bar{position:fixed;left:0;right:0;bottom:0;display:flex;flex-wrap:wrap;gap:6px;
     padding:8px 8px calc(8px + env(safe-area-inset-bottom));
@@ -409,7 +422,9 @@
   .sw[aria-pressed="true"]{border-color:var(--sawn);box-shadow:0 0 0 3px rgba(233,220,196,.18);}
   input[type=range]{flex:1;accent-color:var(--paint);height:34px;}
   #preview{width:44px;flex:none;display:flex;align-items:center;justify-content:center;}
-  #togNum,#togSnd,#togFit{background:var(--bark-2);color:var(--sawn-dim);border:1px solid var(--line);
+  /* 3つとも同じ形・同じ大きさにそろえる。文字数で幅が変わると
+     並びがばらついて見える(2026-09-20) */
+  #togNum,#togSnd,#togFit{flex:1;background:var(--bark-2);color:var(--sawn-dim);border:1px solid var(--line);
     border-radius:999px;padding:8px 16px;font-size:12px;font-weight:600;}
   #togNum.on,#togSnd.on,#togFit.on{color:var(--paint);border-color:var(--paint);}
 
@@ -639,7 +654,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v71';
+const APP_VER='v72';
 document.getElementById('ver').textContent=APP_VER;
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
