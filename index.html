@@ -640,7 +640,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v73';
+const APP_VER='v74';
 document.getElementById('ver').textContent=APP_VER;
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -694,14 +694,26 @@ function refitAfterResize(){
     clampView(); draw();
   }
 }
-window.addEventListener('resize',()=>{
+function reflow(){
   // 端末が本当に横になったら、こちらで回すのはやめる（二重に回ってしまうため）
   if(land && innerWidth > innerHeight){ setLand(false); return; }
   if(land) applyLand();
   shortScreen();
   refitAfterResize();
   fitTopBar(); placePanels(); labelRot();
-});
+}
+/* 端末そのものを回した直後は、まだ**前の大きさ**が返ってくることがある
+   (Android Chromeで実際に起きる。URLバーの出入りでも同じ)。
+   その値で組んだままだと、電卓が入る高さを取り違えて右上のボタンに被る。
+   少し置いてからもう一度測り直す(2026-09-21)。 */
+let reflowTimer=0;
+function reflowSoon(){
+  clearTimeout(reflowTimer);
+  reflowTimer=setTimeout(reflow, 350);
+}
+window.addEventListener('resize',()=>{ reflow(); reflowSoon(); });
+window.addEventListener('orientationchange',()=>{ reflow(); reflowSoon(); });
+if(window.visualViewport) visualViewport.addEventListener('resize', reflowSoon);
 /* 横向きのように**背の低い画面**では、パネルを薄くする(下のCSS body.short) */
 function shortScreen(){
   const h = land ? innerWidth : innerHeight;
@@ -1597,20 +1609,26 @@ function placePanels(){
      並びの位置(offsetTop/offsetHeight)は回転の影響を受けないのでこちらを使う。 */
   const below=el=>el.offsetTop+el.offsetHeight;
   const topEnd=Math.max(below(document.getElementById('topRight')), below(countBox)) + 8;
-  // 横向きに回している時、使える高さは画面の「幅」の方
-  const appH = land ? innerWidth : innerHeight;
+  /* アプリの高さ。下のバーは一番下に貼り付けてあるので、その下端がそのまま高さになる。
+     innerWidth/innerHeight から出すと、回した直後の食い違いを拾ってしまう(2026-09-21) */
+  const appH = bar.offsetHeight ? bar.offsetTop + bar.offsetHeight
+                                : (land ? innerWidth : innerHeight);
   const room=Math.max(200, appH - panelBottom - topEnd);
   for(const el of [autoPanel, savePanel, panel, setPanel, morePanel, statusPanel])
     el.style.maxHeight=room+'px';
   /* 電卓だけは（真ん中に出すので）バーの上に置いている。
      入る高さもその分だけ低い。ここを他と同じ値にしていたため、
      電卓の上端が右上のボタンに被っていた(2026-09-19に修正)。 */
-  const roomCalc=Math.max(180, appH - b - topEnd);
+  /* 入る高さをそのまま使う。以前は最低180pxを確保していたが、
+     入る高さがそれより狭い時に**上のボタンへ被る**原因になっていた(2026-09-21)。
+     狭い時は電卓の中を送って見てもらう。 */
+  const roomCalc=Math.max(120, appH - b - topEnd);
   calcPanel.style.maxHeight=roomCalc+'px';
   /* 横向きの電卓は、キーの段を入る高さいっぱいに広げる。
-     そうしないと左側(式や履歴)の高さに引っ張られ、キーが横に長く潰れる。 */
+     そうしないと左側(式や履歴)の高さに引っ張られ、キーが横に長く潰れる。
+     ここも入る高さを超えないようにする。 */
   const kb=document.getElementById('calcKeys');
-  if(kb) kb.style.minHeight = short ? Math.max(110, roomCalc-46)+'px' : '';
+  if(kb) kb.style.minHeight = short ? Math.max(100, roomCalc-46)+'px' : '';
 }
 guess.addEventListener('input',()=>{ guessVal.textContent=guess.value+'本'; });
 
