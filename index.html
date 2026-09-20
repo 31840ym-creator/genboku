@@ -20,6 +20,9 @@
     --line:#463527;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  /* 指が少し動いても押したことにする。画面を動かす仕草と取り合って
+     押しても反応しないことがあった(2026-09-20) */
+  button,a{touch-action:manipulation;}
   html,body{margin:0;height:100%;overflow:hidden;background:var(--bark);color:var(--sawn);
     font-family:"Roboto","Noto Sans JP",system-ui,sans-serif;}
   /* 画面ぜんぶを包む入れ物。横向きにする時はこれごと90度回す。
@@ -113,8 +116,19 @@
   body.short #morePanel{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:8px;}
   body.short #morePanel .row{display:contents;}
   body.short #morePanel .act{white-space:nowrap;}
-  body.short #setPanel .setHead{margin-bottom:4px;font-size:12px;}
-  body.short #setPanel #setReset{margin-top:6px;}
+  /* 設定も見た目と同じ大きさに揃える。押す所は40px、文字は12.5px。
+     「設定」の見出しは、押したボタンの名前と同じなので横向きでは出さない */
+  body.short #setPanel{display:grid;grid-auto-flow:column;
+    grid-template-rows:repeat(3,auto);gap:8px 14px;
+    justify-content:start;align-items:center;}
+  body.short #setPanel .setHead{display:none;}
+  /* 3つのリンクを見た目パネルと同じ「1列に3つ」の並びに入れる */
+  body.short #setLegal{display:contents;}
+  body.short .setLink{border:1px solid var(--line);border-radius:10px;
+    padding:0 12px;min-height:40px;font-size:12.5px;white-space:nowrap;}
+  body.short .setLink::after{font-size:13px;margin-left:10px;}
+  body.short #setPanel #setReset{margin:0;min-height:40px;font-size:12.5px;
+    white-space:normal;line-height:1.4;padding:8px 12px;max-width:190px;}
   body.short .setRow{padding:5px 0;font-size:12px;}
 
   /* 範囲を囲う時の帯。1行にまとめる */
@@ -129,16 +143,25 @@
     display:flex;align-items:center;justify-content:center;}
   body.short #roiBanner .act.ghost{flex:0 0 auto;}
 
-  /* 見た目パネル。横向きでは4行が縦に積まれて画面の半分を食う。
-     ラベルと丸を小さくし、行の間を詰める */
-  body.short #panel .row{gap:8px;}
-  body.short #panel .row+.row{margin-top:6px;}
-  body.short .lab{width:38px;font-size:11px;}
-  body.short .sw{width:26px;height:26px;}
-  body.short #swatches{gap:7px;}
-  body.short input[type=range]{height:26px;}
-  body.short #preview{width:32px;}
-  body.short #panel button{padding:6px 10px;font-size:11px;}
+  /* 見た目パネル。横向きは**2列**に分けて、5つの行を一度に出す。
+       左 … 色 / 大きさ / 合わせ方
+       右 … 番号 / 音
+     1列に積むと細長くなり、つまみも小さくせざるを得なかった。
+     2列にした分、丸もボタンも大きくできる(2026-09-20)。
+     切り替えボタンはその文字自体が名前なので、左の見出しは出さない */
+  body.short #panel{display:grid;grid-auto-flow:column;
+    grid-template-rows:repeat(3,auto);gap:8px 14px;
+    justify-content:start;align-items:center;}
+  body.short #panel .row{margin:0;gap:8px;}
+  body.short #panel .tog .lab{display:none;}
+  body.short .lab{width:auto;min-width:36px;font-size:12px;}
+  body.short .sw{width:30px;height:30px;}
+  body.short #swatches{gap:5px;}
+  body.short #panel input[type=range]{height:34px;width:112px;}
+  body.short #preview{width:30px;}
+  /* 指で押す所は小さくしない。40px は取りこぼしが出にくい大きさ。
+     色の丸もボタンなので、まるいまま残るよう外しておく */
+  body.short #panel button:not(.sw){min-height:40px;padding:0 14px;font-size:12.5px;}
 
   /* ---- 横向きの電卓 ----
 
@@ -470,15 +493,15 @@
     <input type="range" id="size" min="25" max="115" step="5" value="100">
     <span id="preview"></span>
   </div>
-  <div class="row">
+  <div class="row tog">
     <span class="lab">合わせ方</span>
     <button id="togFit" class="on">木口に合わせる</button>
   </div>
-  <div class="row">
+  <div class="row tog">
     <span class="lab">番号</span>
     <button id="togNum" class="on">番号を表示する</button>
   </div>
-  <div class="row">
+  <div class="row tog">
     <span class="lab">音</span>
     <button id="togSnd" class="on">タップ音を鳴らす</button>
   </div>
@@ -616,7 +639,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v70';
+const APP_VER='v71';
 document.getElementById('ver').textContent=APP_VER;
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
