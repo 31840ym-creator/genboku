@@ -75,10 +75,12 @@
   /* 薄い帯のパネルはつまみを出さない。中身に重なって読めなくなるため。
      同じボタンをもう一度押せば閉じられる(2026-09-19) */
   body.short #autoPanel .grab, body.short #savePanel .grab, body.short #morePanel .grab,
-  body.short #statusPanel .grab, body.short #calcPanel .grab{display:none;}
+  body.short #statusPanel .grab{display:none;}
   /* 見た目と設定は縦向きと同じ並びで背が高いので、つまみを出す。
      余白が狭いぶん、はみ出し量を padding に合わせる(2026-09-21) */
   body.short #panel .grab, body.short #setPanel .grab{margin:-5px -12px 2px;}
+  /* 電卓も背が高いので、横向きでもつまみを出す(2026-09-22) */
+  body.short #calcPanel .grab{height:20px;margin:-6px -8px 0;}
   body.short .row+.row{margin-top:6px;}
   body.short .act{padding:7px 4px;font-size:12px;}
   body.short .sub{padding:7px 4px;font-size:12px;}
@@ -167,6 +169,7 @@
   body.short #calcPanel{padding:6px 8px 8px;}
   /* 上の余白はできるだけ削って、キーに高さを回す */
   body.short #calcHistBtn{padding:4px 9px;font-size:11px;border-radius:8px;}
+  body.short #calcPanel .grab::before{width:38px;height:4px;}
   body.short #calcTop{gap:8px;}
   body.short #calcExpr{font-size:19px;min-height:24px;}
   body.short #calcDisp{font-size:13px;min-height:16px;margin:1px 0 4px;}
@@ -643,7 +646,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v77';
+const APP_VER='v78';
 document.getElementById('ver').textContent=APP_VER;
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -1619,9 +1622,12 @@ function fitTopRight(){
 }
 
 function fitTopBar(){
-  // 横向きは左下（バーと同じ帯）、縦向きはバーの上
+  // 横向きは左下（バーと同じ帯）、縦向きはバーの上。
+  // 横向きの高さはボタンの下端に合わせる(切り欠きの分だけ上げる)
   const short=document.body.classList.contains('short');
-  const y = short ? 8 : bar.offsetHeight+8;
+  const fb=bar.querySelector('button');
+  const gap = fb ? Math.max(8, Math.round(bar.offsetHeight - (fb.offsetTop+fb.offsetHeight))) : 8;
+  const y = short ? gap : bar.offsetHeight+8;
   for(const id of ['eraseBanner','roiBanner']){
     const el=document.getElementById(id);
     if(el) el.style.bottom=y+'px';
@@ -1636,7 +1642,16 @@ function placePanels(){
      パネルはその**空いた左下**に、バーと同じ帯の高さで置く。
      縦向きは今までどおりバーの上に重ねる。 */
   const firstBtn=bar.querySelector('button');
-  const panelBottom = short ? 8 : b;
+  /* 横向きのパネルは、下のバーの**ボタンと下端をそろえる**。
+     バーの下の余白には端末の切り欠きの分(env(safe-area-inset-bottom))が
+     入っている。iPhone 11 では21pxほどあり、パネルだけ8px固定にしていたため
+     ボタンが浮いて見えた(2026-09-22)。
+     env() の値を読む代わりに、ボタンの下に何px空いているかを実測する。 */
+  const appHeight = bar.offsetTop + bar.offsetHeight;
+  const btnBottom = firstBtn ? bar.offsetTop + firstBtn.offsetTop + firstBtn.offsetHeight
+                             : appHeight - 8;
+  const safeGap = Math.max(8, Math.round(appHeight - btnBottom));
+  const panelBottom = short ? safeGap : b;
   const panelMax = short
     ? Math.max(180, (firstBtn ? firstBtn.offsetLeft : bar.offsetWidth) - 16)
     : 0;
