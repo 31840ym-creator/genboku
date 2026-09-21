@@ -271,6 +271,15 @@
   #roiGo,#roiBanner,#eraseBanner,#calcPanel,#hint{z-index:4;}
   #busy{z-index:9;}
 
+  /* タブレットやPCのような**幅の広い画面**では、横いっぱいに広げない。
+     「数える」が画面の端から端まで伸びた帯になり、ボタン1つが
+     300pxを超えて押しにくく、見た目も締まらない(2026-09-21)。
+     スマホ(375px程度)では上限に届かないので、これまでと同じに見える。 */
+  #autoPanel,#savePanel,#panel,#setPanel,#morePanel,#statusPanel,#roiGo,#roiBanner{
+    max-width:560px;margin-left:auto;margin-right:auto;}
+  #bar{justify-content:center;}
+  #bar button{max-width:120px;}
+
   #bar{position:fixed;left:0;right:0;bottom:0;display:flex;flex-wrap:wrap;gap:6px;
     padding:8px 8px calc(8px + env(safe-area-inset-bottom));
     background:linear-gradient(to top,rgba(30,22,16,.96),rgba(30,22,16,.6));}
@@ -575,6 +584,8 @@
   <div class="setRow"><span>アプリの版</span><b id="setVer">-</b></div>
   <div class="setRow"><span>AI</span><b id="setAI">-</b></div>
   <div class="setRow"><span>数え方</span><b id="setConf">-</b></div>
+  <!-- AIが読めなかった理由。横向きでは自動パネルの案内文を隠すので、ここにも出す -->
+  <div class="setRow hide" id="setAIWhyRow"><span>理由</span><b id="setAIWhy">-</b></div>
 </div>
 
 <!-- 設定。「その他」から開く -->
@@ -632,7 +643,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v75';
+const APP_VER='v76';
 document.getElementById('ver').textContent=APP_VER;
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -2044,6 +2055,10 @@ verBtn.onclick=()=>{
   document.getElementById('setAI').textContent =
     aiReady ? '使えます' : (aiTried ? '使えません' : 'まだ読み込んでいません');
   document.getElementById('setConf').textContent = aiReady ? 'AIで数える' : '写真の明るさで数える';
+  // 読めなかった理由。古い端末で何が起きたかを、その場で見られるようにする
+  const whyRow=document.getElementById('setAIWhyRow');
+  whyRow.classList.toggle('hide', !(aiError && !aiReady));
+  if(aiError) document.getElementById('setAIWhy').textContent = aiError;
   statusPanel.classList.remove('hide');
   verBtn.classList.add('on');
   placePanels();
