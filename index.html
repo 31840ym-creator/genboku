@@ -646,7 +646,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v78';
+const APP_VER='v79';
 document.getElementById('ver').textContent=APP_VER;
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -1441,21 +1441,20 @@ const AI_SIZE=960;                 // 学習時と同じ大きさ
    通信量は変わらない(同じファイルを、取りに行く先が変わるだけ)。
    ort/ の中身は onnxruntime-web 1.20.1 の dist から取った3つ。
 
-   **古い端末向けにもう1組ある**(2026-09-21)。
-   1.20 は SIMD という新しい命令を使う版しか配っていない。
-   SIMDは Safari 16.4 から使えるもので、iPhone 7 のように iOS 15 で
-   止まる端末では読み込めず、CVモードへ落ちていた。
-   実機に出ていた文言:
-     モデル: no available backend found. ERR: [wasm] Error:
-     WebAssembly SIMD is not supported in the current environment.
-   そこで SIMD なしでも動く 1.18 を ort_nosimd/ に置き、
-   **SIMDが使えない端末だけ**そちらを読む。新しい端末は今までどおりで、
-   増えたファイルを取りに行くこともない。 */
-const AI_LIB    ={ base:new URL('./ort/',        location.href).href, file:'ort.min.mjs', esm:true  };
-const AI_LIB_OLD={ base:new URL('./ort_nosimd/', location.href).href, file:'ort.min.js',  esm:false };
+   通信量は変わらない(同じファイルを、取りに行く先が変わるだけ)。
+   ort/ の中身は onnxruntime-web 1.20.1 の dist から取った3つ。 */
+const AI_LIB={ base:new URL('./ort/', location.href).href, file:'ort.min.mjs' };
 
 /* この端末で WebAssembly の SIMD が使えるか。
-   SIMD命令をひとつだけ含む最小のwasmを、ブラウザが読めるか試している。 */
+   SIMD命令をひとつだけ含む最小のwasmを、ブラウザが読めるか試している。
+
+   SIMD は「同じ計算を4つまとめて片付ける」仕組みで、AIの推論はその塊。
+   Safari 16.4 から使えるもので、iPhone 7 のように iOS 15 で止まる端末には無い。
+
+   一度は SIMD なしで動く古いライブラリ(1.18)も同梱してみたが(v77)、
+   **iPhone 7 の実測で1枚80秒**かかり、荷渡しの場では待てなかった。
+   本体が3倍遅く、SIMDなしでさらに3〜4倍遅いので掛け算で効く。
+   10MBを取りに行かせる値打ちが無いため、同梱をやめた(2026-09-22)。 */
 function hasSimd(){
   try{
     return WebAssembly.validate(new Uint8Array([
@@ -1464,18 +1463,6 @@ function hasSimd(){
     ]));
   }catch(e){ return false; }
 }
-/* 昔ながらの <script> で読む(1.18の配布物はモジュール形式ではない)。
-   読み終わると window.ort に入る。 */
-function loadScript(src){
-  return new Promise((ok,ng)=>{
-    const el=document.createElement('script');
-    el.src=src; el.onload=()=>ok(); el.onerror=()=>ng(new Error('読み込めません'));
-    document.head.appendChild(el);
-  });
-}
-/* 読み込んだAIライブラリ。名前を ortLib にしてあるのは、
-   1.18の配布物が自分で `var ort` を作るため。こちらが `ort` を使っていると
-   名前がぶつかって、読み込んでも中身が入らない(2026-09-21) */
 let ortLib=null, session=null, aiReady=false, aiTried=false, aiError='';
 let aiJob=null;   // 読み込み中の処理。2回目以降の呼び出しは、これが終わるのを待つ
 
@@ -1487,19 +1474,18 @@ function loadAI(){
 async function loadAIOnce(){
   aiTried=true;
   aiError='';
-  // SIMDが使えるかで、読むライブラリを先に決める。無駄な通信をしない
-  const lib=hasSimd() ? AI_LIB : AI_LIB_OLD;
-  const base=lib.base;
+  /* 古い端末はここで切る。動かせたとしても1枚80秒かかって現場では待てない。
+     英語のエラーを見せても仕方がないので、こちらの言葉で伝える。 */
+  if(!hasSimd()){
+    aiError='この端末は古いため使えません。本数を合わせて数えてください。';
+    return false;
+  }
+  const base=AI_LIB.base;
 
   try{
-    if(lib.esm){
-      const m=await import(base+lib.file);
-      if(m && m.InferenceSession) ortLib=m;
-      else if(window.ort) ortLib=window.ort;
-    }else{
-      await loadScript(base+lib.file);
-      if(window.ort) ortLib=window.ort;
-    }
+    const m=await import(base+AI_LIB.file);
+    if(m && m.InferenceSession) ortLib=m;
+    else if(window.ort) ortLib=window.ort;
   }catch(e){
     aiError='ライブラリ: '+String(e.message||e).slice(0,80);
   }
@@ -1512,7 +1498,6 @@ async function loadAIOnce(){
   try{
     ortLib.env.wasm.wasmPaths=base;
     ortLib.env.wasm.numThreads=1;
-    if(!lib.esm) ortLib.env.wasm.simd=false;   // SIMDの無い端末。SIMDなしの.wasmを取りに行かせる
     const res=await fetch(MODEL_FILE);
     if(!res.ok) throw new Error('モデルHTTP '+res.status);
     const buf=new Uint8Array(await res.arrayBuffer());
