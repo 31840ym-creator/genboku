@@ -226,6 +226,9 @@
     opacity:.85;pointer-events:none;}
   /* 中の字はカタカナ2文字(タテ/ヨコ)。丸い矢印の内側に収まる大きさにする */
   #rotate b{position:relative;font-size:11px;font-weight:800;line-height:1;letter-spacing:-.04em;}
+  /* 「タテ」は字のとおり縦に積む。矢印の上下の弧の間(約32px)に収める。
+     縦書き(vertical-rl)ならカタカナは立ったまま縦に並ぶ */
+  #rotate b.vert{writing-mode:vertical-rl;font-size:12px;line-height:1.1;letter-spacing:.02em;}
   #rotate:active{background:#3A2C1F;}
   #rotate.on{border-color:var(--paint);color:var(--paint);}
   #calcBtn svg,#camBtn svg{width:26px;height:26px;display:block;}
@@ -656,7 +659,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v81';
+const APP_VER='v82';
 document.getElementById('ver').textContent=APP_VER;
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -1122,6 +1125,7 @@ function blink(el){
 }
 document.getElementById('undo').onclick=()=>{
   blink(document.getElementById('undo'));
+  if(marks.length) beep('del');    // 印を1つ消すので、消した時と同じ音
   marks.pop(); updateCount(); draw();
 };
 const eraseBtn=document.getElementById('erase'), eraseBanner=document.getElementById('eraseBanner');
@@ -1163,7 +1167,9 @@ function isLand(){ return land || innerWidth > innerHeight; }
    縦で見ている時は「横」、横で見ている時は「縦」。 */
 function labelRot(){
   const L=isLand();
+  // 「タテ」は2文字を縦に積む。「ヨコ」は横のまま(丸い矢印の中に収まる形)
   rotFace.textContent = L ? 'タテ' : 'ヨコ';
+  rotFace.classList.toggle('vert', L);
   rotBtn.classList.toggle('on', L);
   rotBtn.setAttribute('aria-label', L ? '縦向きにする' : '横向きにする');
 }
