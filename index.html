@@ -55,6 +55,7 @@
   /* パネルは左下。幅は「ボタンの手前まで」に収める(--panelmax はJSが実測して入れる) */
   body.short #autoPanel, body.short #savePanel, body.short #morePanel,
   body.short #panel, body.short #setPanel, body.short #statusPanel,
+  body.short #sharePanel, body.short #logPanel,
   body.short #roiBanner, body.short #eraseBanner, body.short #roiGo{
     left:8px;right:auto;width:auto;max-width:var(--panelmax,60%);}
   /* 帯も浮いた箱になるので角を丸める */
@@ -76,7 +77,8 @@
      高さが375px程度しかないので、パネルは**下のバーと同じくらいの薄さ**に収める。
      文字は小さく1行、ボタンは横並び、余白は最小。つまみは重ねて高さを食わない。 */
   body.short #autoPanel, body.short #savePanel, body.short #morePanel,
-  body.short #panel, body.short #setPanel, body.short #statusPanel{
+  body.short #panel, body.short #setPanel, body.short #statusPanel,
+  body.short #sharePanel, body.short #logPanel{
     padding:5px 12px 7px;border-radius:13px;overflow-x:hidden;}
   /* 薄い帯のパネルはつまみを出さない。中身に重なって読めなくなるため。
      同じボタンをもう一度押せば閉じられる(2026-09-19) */
@@ -84,7 +86,8 @@
   body.short #statusPanel .grab{display:none;}
   /* 見た目と設定は縦向きと同じ並びで背が高いので、つまみを出す。
      余白が狭いぶん、はみ出し量を padding に合わせる(2026-09-21) */
-  body.short #panel .grab, body.short #setPanel .grab{margin:-5px -12px 2px;}
+  body.short #panel .grab, body.short #setPanel .grab,
+  body.short #sharePanel .grab, body.short #logPanel .grab{margin:-5px -12px 2px;}
   /* 電卓も背が高いので、横向きでもつまみを出す(2026-09-22) */
   body.short #calcPanel .grab{height:20px;margin:-6px -8px 0;}
   body.short .row+.row{margin-top:6px;}
@@ -123,7 +126,9 @@
      絵文字の分だけ「見た目」と「戻す」で太さが変わっていた(2026-09-20)。
      並びではなく格子にしているのは、1fr の列は全部同じ幅になり、
      しかも一番長い文字に合わせて広がってくれるため(折り返さない) */
-  body.short #morePanel{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:8px;}
+  /* 共有と記録を足して6つになったので、横向きは3つずつ2段にする(2026-09-23)。
+     1段に6つ並べると、幅の狭い端末でボタンがはみ出す */
+  body.short #morePanel{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
   body.short #morePanel .row{display:contents;}
   body.short #morePanel .act{white-space:nowrap;}
   /* 設定も見た目と同じ大きさに揃える。押す所は40px、文字は12.5px。
@@ -283,7 +288,7 @@
      「木口に合わせる」が押せなかったのはこれ(2026-09-20)。
        3 バー < 4 パネル類 < 5 右上のボタン < 9 読み込み中の幕 */
   #bar{z-index:3;}
-  #panel,#autoPanel,#savePanel,#morePanel,#setPanel,#statusPanel,
+  #panel,#autoPanel,#savePanel,#morePanel,#setPanel,#statusPanel,#sharePanel,#logPanel,
   #roiGo,#roiBanner,#eraseBanner,#calcPanel,#hint{z-index:4;}
   #busy{z-index:9;}
 
@@ -291,7 +296,7 @@
      「数える」が画面の端から端まで伸びた帯になり、ボタン1つが
      300pxを超えて押しにくく、見た目も締まらない(2026-09-21)。
      スマホ(375px程度)では上限に届かないので、これまでと同じに見える。 */
-  #autoPanel,#savePanel,#panel,#setPanel,#morePanel,#statusPanel,#roiGo,#roiBanner{
+  #autoPanel,#savePanel,#panel,#setPanel,#morePanel,#statusPanel,#sharePanel,#logPanel,#roiGo,#roiBanner{
     max-width:560px;margin-left:auto;margin-right:auto;}
   #bar{justify-content:center;}
   #bar button{max-width:120px;}
@@ -319,6 +324,31 @@
     background:rgba(38,30,22,.97);border:1px solid var(--line);border-radius:16px;
     padding:14px 16px 16px;backdrop-filter:blur(8px);}
   #savePanel,#autoPanel,#panel{overflow-y:auto;overflow-x:hidden;}
+
+  /* 共有の確認と、記録の一覧(2026-09-23) */
+  #sharePanel,#logPanel{position:fixed;left:8px;right:8px;bottom:150px;
+    background:rgba(38,30,22,.97);border:1px solid var(--line);border-radius:16px;
+    padding:14px 16px 16px;backdrop-filter:blur(8px);overflow-y:auto;overflow-x:hidden;}
+  #shareMsg{font-size:12px;line-height:1.6;color:var(--sawn-dim);margin-bottom:8px;}
+  /* 共有も本数が相手に渡る場面なので、保存と同じく確認をうながす */
+  #shareCaution{font-size:11.5px;line-height:1.55;color:#E8A96B;
+    border-top:1px solid var(--line);padding-top:9px;margin-bottom:12px;}
+  .act:disabled{opacity:.5;}
+  .logRow{display:flex;align-items:center;gap:12px;width:100%;padding:8px 2px;
+    background:none;border:0;border-top:1px solid var(--line);color:var(--sawn);text-align:left;}
+  .logRow img{width:64px;height:48px;object-fit:cover;border-radius:6px;flex:none;background:#000;}
+  .logN{font-size:22px;font-weight:800;color:var(--paint);min-width:3.2em;font-variant-numeric:tabular-nums;}
+  .logN small{font-size:11px;font-weight:600;margin-left:2px;color:var(--sawn-dim);}
+  .logMeta{font-size:11.5px;line-height:1.5;color:var(--sawn-dim);}
+  .logEmpty{font-size:12px;line-height:1.7;color:var(--sawn-dim);padding:14px 0;text-align:center;}
+  #logClear{margin-top:10px;width:100%;}
+  /* 記録を1件大きく見る。パネルより手前、読み込み中の幕より奥 */
+  #logView{position:fixed;inset:0;z-index:8;background:#0C0906;
+    display:flex;flex-direction:column;gap:10px;padding:14px;}
+  #logViewTop{display:flex;align-items:baseline;gap:12px;color:var(--sawn-dim);font-size:12px;}
+  #logViewN{font-size:30px;font-weight:800;color:var(--paint);}
+  #logViewImg{flex:1;min-height:0;width:100%;object-fit:contain;}
+  #logViewBtns{display:flex;gap:8px;}
   #saveMsg{font-size:12px;line-height:1.6;color:var(--sawn-dim);margin-bottom:10px;}
   /* 保存は本数が記録に残る場面なので、ここでも確認をうながす */
   #saveCaution{font-size:11.5px;line-height:1.55;color:#E8A96B;
@@ -561,6 +591,10 @@
     <button id="undo" class="act ghost2"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10h10a5.5 5.5 0 0 1 0 11h-4"/><path d="M8 5.5 3.5 10 8 14.5"/></svg></i>戻す</button>
     <button id="openSet" class="act ghost2"><i>⚙</i>設定</button>
   </div>
+  <div class="row" style="gap:8px">
+    <button id="shareBtn" class="act ghost2"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7.5 7.5 12 3l4.5 4.5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg></i>共有</button>
+    <button id="logBtn" class="act ghost2"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 10h6M9 14h6M9 18h4"/></svg></i>記録</button>
+  </div>
 </div>
 
 <div id="autoPanel" class="hide">
@@ -619,6 +653,37 @@
   <button id="setReset" class="sub">うまく動かない時：保存庫を作り直す</button>
 </div>
 
+<!-- 共有の確認。「共有する」を押したその指で共有を開く
+     (端末の決まりで、押した直後でないと共有の画面を開けないため、絵は先に作っておく) -->
+<div id="sharePanel" class="hide">
+  <div class="grab" aria-label="つまんで下げると閉じます"></div>
+  <div id="shareMsg"></div>
+  <div id="shareCaution"></div>
+  <div class="row" style="gap:8px">
+    <button id="shareGo" class="act" disabled>準備しています…</button>
+    <button id="shareNo" class="act ghost2">やめる</button>
+  </div>
+</div>
+
+<!-- 記録の一覧。保存や共有をした時の本数を、この端末の中にだけ残す -->
+<div id="logPanel" class="hide">
+  <div class="grab" aria-label="つまんで下げると閉じます"></div>
+  <div class="setHead" id="logHead">記録</div>
+  <div id="logList"></div>
+  <button id="logClear" class="sub hide">記録を全部消す</button>
+</div>
+
+<!-- 記録を1件、大きく見る -->
+<div id="logView" class="hide">
+  <div id="logViewTop"><b id="logViewN"></b><span id="logViewT"></span></div>
+  <img id="logViewImg" alt="記録した写真">
+  <div id="logViewBtns">
+    <button id="logViewShare" class="act">共有</button>
+    <button id="logViewDel" class="act ghost2">この記録を消す</button>
+    <button id="logViewClose" class="act ghost2">閉じる</button>
+  </div>
+</div>
+
 <div id="calcPanel" class="hide">
   <div class="grab" aria-label="つまんで下げると閉じます"></div>
   <div id="calcTop">
@@ -666,7 +731,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v84';
+const APP_VER='v85';
 document.getElementById('ver').textContent=APP_VER;
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -1269,7 +1334,7 @@ function loadPref(){
 const lookBtn=document.getElementById('look');
 function closeLook(){ panel.classList.add('hide'); lookBtn.classList.remove('on'); }
 /* パネルは同じ場所に出るので、1枚だけ開くようにする */
-function closePanels(){ closeAuto(); closeSave(); closeCalc(); closeLook(); closeSet(); closeStatus(); closeMore(); showRoiGo(false); }
+function closePanels(){ closeAuto(); closeSave(); closeCalc(); closeLook(); closeSet(); closeStatus(); closeMore(); closeShare(); closeLog(); showRoiGo(false); }
 lookBtn.onclick=()=>{
   if(!panel.classList.contains('hide')){ closeLook(); return; }
   closePanels();
@@ -1691,7 +1756,9 @@ function placePanels(){
     : 0;
   document.documentElement.style.setProperty('--panelmax', panelMax ? panelMax+'px' : '');
 
-  for(const el of [autoPanel, panel, roiGo, morePanel, statusPanel, savePanel, setPanel])
+  // 共有と記録は後から足したパネル。宣言より先に呼ばれても困らないよう、ここで探す
+  const sharePanelEl=document.getElementById('sharePanel'), logPanelEl=document.getElementById('logPanel');
+  for(const el of [autoPanel, panel, roiGo, morePanel, statusPanel, savePanel, setPanel, sharePanelEl, logPanelEl])
     el.style.bottom = panelBottom+'px';
   hint.style.bottom = (short ? panelBottom : b+6)+'px';   // 横向きは左下の空きへ
 
@@ -1708,7 +1775,7 @@ function placePanels(){
   const appH = bar.offsetHeight ? bar.offsetTop + bar.offsetHeight
                                 : (land ? innerWidth : innerHeight);
   const room=Math.max(200, appH - panelBottom - topEnd);
-  for(const el of [autoPanel, savePanel, panel, setPanel, morePanel, statusPanel])
+  for(const el of [autoPanel, savePanel, panel, setPanel, morePanel, statusPanel, sharePanelEl, logPanelEl])
     el.style.maxHeight=room+'px';
   /* 電卓だけは（真ん中に出すので）バーの上に置いている。
      入る高さもその分だけ低い。ここを他と同じ値にしていたため、
@@ -2015,9 +2082,22 @@ document.getElementById('savePng').onclick=()=>{
   if(!confirm(`${marks.length}本として保存します。
 本数に相違ありませんか？`)) return;
   closeSave();
+  renderMarked().toBlob(b=>downloadBlob(b, markedName('png')), 'image/png');
+  recordNow();   // 記録にも残す
+};
+
+/* 印をつけた写真を1枚の絵にする。保存・共有・記録の3つで同じものを使う。
+   maxSide を渡すと、長い辺がその大きさになるよう縮める(共有や記録は軽くしたい) */
+function markedName(ext){
+  const d=new Date(), p=n=>String(n).padStart(2,'0');
+  return `genboku_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}_${marks.length}hon.${ext}`;
+}
+function renderMarked(maxSide){
+  const sc = maxSide ? Math.min(1, maxSide/Math.max(img.width,img.height)) : 1;
   const c=document.createElement('canvas');
-  c.width=img.width; c.height=img.height;
+  c.width=Math.round(img.width*sc); c.height=Math.round(img.height*sc);
   const g=c.getContext('2d');
+  g.scale(sc,sc);              // ここから先は元の写真の座標で描ける
   g.drawImage(img,0,0);
   // 画面と同じ見え方で焼き込む(木口に合わせた大きさ)
   const r=Math.max(4, (logSpan>0 ? logSpan*0.45 : Math.max(img.width,img.height)*0.008)*markScale);
@@ -2041,15 +2121,181 @@ document.getElementById('savePng').onclick=()=>{
   g.fillStyle='rgba(30,22,16,.85)';
   g.fillRect(fs*0.4,fs*0.4,w+fs*0.8,fs*1.5);
   g.fillStyle=markColor; g.fillText(label,fs*0.8,fs*0.75);
+  return c;
+}
 
-  const d=new Date(), p=n=>String(n).padStart(2,'0');
-  const name=`genboku_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}_${marks.length}hon.png`;
-  c.toBlob(b=>{
-    const a=document.createElement('a');
-    a.href=URL.createObjectURL(b); a.download=name; a.click();
-    setTimeout(()=>URL.revokeObjectURL(a.href),3000);
-  },'image/png');
+/* ================= 共有 =================
+   印をつけた写真を、LINEやメールへそのまま渡す(端末の「共有」を開く)。
+   端末の決まりで、共有は**押した直後**でないと開けない。確認のために
+   confirm() を挟むと、答えるのに数秒かかった時に開けなくなる。
+   そこで確認はパネルに出し、絵は先に作っておいて、
+   「共有する」を押したその指で共有を開く。 */
+let shareFile=null;
+function closeShare(){
+  const P=document.getElementById('sharePanel');
+  if(P) P.classList.add('hide');
+  shareFile=null;
+}
+async function openShare(){
+  if(!img) return;
+  if(!marks.length){ alert('印が1つもありません。数えてから共有してください。'); return; }
+  closePanels();
+  const P=document.getElementById('sharePanel'), go=document.getElementById('shareGo');
+  document.getElementById('shareMsg').innerHTML=
+    `現在 <b style="color:var(--paint)">${marks.length}本</b>。印をつけた写真を、LINEやメールでそのまま送れます。`;
+  document.getElementById('shareCaution').textContent=
+    `${marks.length}本として共有します。本数に相違ありませんか？`;
+  go.disabled=true; go.textContent='準備しています…';
+  P.classList.remove('hide'); placePanels();
+  const blob=await new Promise(ok=>renderMarked(2400).toBlob(ok,'image/jpeg',0.9));
+  if(P.classList.contains('hide')) return;          // 作っている間に閉じられた
+  shareFile=new File([blob], markedName('jpg'), {type:'image/jpeg'});
+  const can=!!(navigator.canShare && navigator.canShare({files:[shareFile]}));
+  go.dataset.mode = can ? 'share' : 'save';
+  go.textContent  = can ? '共有する' : '画像を保存する';
+  go.disabled=false;
+}
+document.getElementById('shareGo').onclick=()=>{
+  const go=document.getElementById('shareGo'), f=shareFile, n=marks.length;
+  if(!f) return;
+  if(go.dataset.mode==='share'){
+    // ここで await を挟まない(挟むと「押した直後」でなくなり、開けない端末がある)
+    navigator.share({files:[f], text:`${n}本`}).then(()=>{
+      recordNow(); closeShare(); flash('共有しました。記録にも残しました', 4000);
+    }).catch(e=>{
+      if(e && e.name==='AbortError') return;       // 自分でやめた時は何も言わない
+      alert('共有できませんでした：'+(e && e.message || e));
+    });
+  }else{
+    downloadBlob(f, f.name); recordNow(); closeShare();
+    flash('この端末では共有が使えないため、画像を保存しました', 5000);
+  }
 };
+document.getElementById('shareNo').onclick=closeShare;
+document.getElementById('shareBtn').onclick=openShare;
+
+/* ================= 記録 =================
+   保存か共有をした時の本数・日時・印つきの写真を、この端末の中にだけ残す。
+   外へは送らない。写真を入れるので localStorage ではなく IndexedDB を使う。
+   多くなりすぎないよう、新しい方から LOG_MAX 件まで残す。 */
+const LOG_MAX=200;
+function logDb(){
+  return new Promise((ok,ng)=>{
+    const r=indexedDB.open('genboku-log',1);
+    r.onupgradeneeded=()=>r.result.createObjectStore('rec',{keyPath:'t'});
+    r.onsuccess=()=>ok(r.result); r.onerror=()=>ng(r.error);
+  });
+}
+function logTx(mode, fn){
+  return logDb().then(db=>new Promise((ok,ng)=>{
+    const tx=db.transaction('rec',mode); const st=tx.objectStore('rec');
+    const out=fn(st);
+    tx.oncomplete=()=>{ db.close(); ok(out && out.result); };
+    tx.onerror=()=>{ db.close(); ng(tx.error); };
+  }));
+}
+async function logAll(){
+  const recs=await logTx('readonly', st=>st.getAll()) || [];
+  return recs.sort((a,b)=>b.t-a.t);
+}
+async function logAdd(rec){
+  await logTx('readwrite', st=>st.put(rec));
+  const recs=await logAll();
+  for(const r of recs.slice(LOG_MAX)) await logTx('readwrite', st=>st.delete(r.t));
+}
+function logDelete(t){ return logTx('readwrite', st=>st.delete(t)); }
+function logClearAll(){ return logTx('readwrite', st=>st.clear()); }
+
+/* いま画面にある本数を記録する。失敗しても保存や共有そのものは止めない */
+async function recordNow(){
+  if(!img || !marks.length) return;
+  try{
+    const b=await new Promise(ok=>renderMarked(800).toBlob(ok,'image/jpeg',0.8));
+    await logAdd({t:Date.now(), n:marks.length, ai:aiCount, add:addCount, del:delCount, img:b});
+  }catch(e){}
+}
+
+function fmtTime(t){
+  const d=new Date(t), p=n=>String(n).padStart(2,'0');
+  const y = d.getFullYear()!==new Date().getFullYear() ? d.getFullYear()+'/' : '';
+  return `${y}${d.getMonth()+1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function breakdown(r){
+  if(r.ai==null) return '手で数えた';
+  return `AI ${r.ai}` + (r.add?` +${r.add}`:'') + (r.del?` −${r.del}`:'');
+}
+let logUrls=[];
+function freeLogUrls(){ logUrls.forEach(u=>URL.revokeObjectURL(u)); logUrls=[]; }
+function closeLog(){
+  const P=document.getElementById('logPanel');
+  if(P) P.classList.add('hide');
+  const V=document.getElementById('logView');
+  if(V) V.classList.add('hide');
+  freeLogUrls();
+}
+async function openLog(){
+  closePanels();
+  const P=document.getElementById('logPanel'), list=document.getElementById('logList');
+  list.innerHTML='<div class="logEmpty">読み込んでいます…</div>';
+  P.classList.remove('hide'); placePanels();
+  let recs;
+  try{ recs=await logAll(); }
+  catch(e){ list.innerHTML='<div class="logEmpty">記録を読めませんでした</div>'; return; }
+  freeLogUrls();
+  document.getElementById('logHead').textContent=`記録（${recs.length}件）`;
+  document.getElementById('logClear').classList.toggle('hide', !recs.length);
+  if(!recs.length){
+    list.innerHTML='<div class="logEmpty">まだ記録がありません。<br>画像を保存するか共有すると、ここに残ります。</div>';
+    placePanels(); return;
+  }
+  list.innerHTML='';
+  for(const r of recs){
+    const u=URL.createObjectURL(r.img); logUrls.push(u);
+    const b=document.createElement('button'); b.className='logRow';
+    b.innerHTML=`<img src="${u}" alt=""><span class="logN">${r.n}<small>本</small></span>`+
+      `<span class="logMeta">${fmtTime(r.t)}<br>${breakdown(r)}</span>`;
+    b.onclick=()=>openLogView(r,u);
+    list.appendChild(b);
+  }
+  placePanels();
+}
+let viewRec=null, viewFile=null;
+function openLogView(r,u){
+  viewRec=r;
+  const d=new Date(r.t), p=n=>String(n).padStart(2,'0');
+  viewFile=new File([r.img],
+    `genboku_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}_${r.n}hon.jpg`,
+    {type:'image/jpeg'});
+  document.getElementById('logViewN').textContent=r.n+'本';
+  document.getElementById('logViewT').textContent=fmtTime(r.t)+'　'+breakdown(r);
+  document.getElementById('logViewImg').src=u;
+  const can=!!(navigator.canShare && navigator.canShare({files:[viewFile]}));
+  const sb=document.getElementById('logViewShare');
+  sb.dataset.mode = can ? 'share' : 'save';
+  sb.textContent  = can ? '共有' : '画像を保存';
+  document.getElementById('logView').classList.remove('hide');
+}
+document.getElementById('logViewClose').onclick=()=>document.getElementById('logView').classList.add('hide');
+document.getElementById('logViewShare').onclick=()=>{
+  if(!viewFile) return;
+  if(document.getElementById('logViewShare').dataset.mode==='share'){
+    navigator.share({files:[viewFile], text:`${viewRec.n}本（${fmtTime(viewRec.t)}）`}).catch(e=>{
+      if(e && e.name!=='AbortError') alert('共有できませんでした：'+(e.message||e));
+    });
+  }else downloadBlob(viewFile, viewFile.name);
+};
+document.getElementById('logViewDel').onclick=async()=>{
+  if(!viewRec || !confirm('この記録を消しますか？')) return;
+  await logDelete(viewRec.t);
+  document.getElementById('logView').classList.add('hide');
+  openLog();
+};
+document.getElementById('logClear').onclick=async()=>{
+  if(!confirm('記録を全部消しますか？ 元には戻せません。')) return;
+  await logClearAll();
+  openLog();
+};
+document.getElementById('logBtn').onclick=openLog;
 
 
 /* ================= 学習データの書き出し =================
@@ -2420,6 +2666,8 @@ function bindGrab(panelEl, closeFn){
 
 bindGrab(autoPanel, closeAuto);
 bindGrab(savePanel, closeSave);
+bindGrab(document.getElementById('sharePanel'), closeShare);
+bindGrab(document.getElementById('logPanel'), closeLog);
 bindGrab(panel, closeLook);
 bindGrab(calcPanel, closeCalc);
 bindGrab(setPanel, closeSet);
