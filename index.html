@@ -220,9 +220,12 @@
     display:flex;align-items:center;justify-content:center;}
   /* 向きの切り替え。押すと「横」⇄「縦」が入れ替わる */
   #rotate{position:relative;}
-  #rotate svg{position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);
+  /* 矢印はボタンいっぱいに広げる。小さいと矢印の先が真ん中に寄ってきて、
+     中のカタカナ2文字(タテ/ヨコ)と重なって読めない(2026-09-23) */
+  #rotate svg{position:absolute;inset:0;width:100%;height:100%;
     opacity:.85;pointer-events:none;}
-  #rotate b{position:relative;font-size:15px;font-weight:800;line-height:1;}
+  /* 中の字はカタカナ2文字(タテ/ヨコ)。丸い矢印の内側に収まる大きさにする */
+  #rotate b{position:relative;font-size:11px;font-weight:800;line-height:1;letter-spacing:-.04em;}
   #rotate:active{background:#3A2C1F;}
   #rotate.on{border-color:var(--paint);color:var(--paint);}
   #calcBtn svg,#camBtn svg{width:26px;height:26px;display:block;}
@@ -328,6 +331,10 @@
   .sub:active{color:#00C6FF;border-color:#2A5A6B;}
   /* 「その他」の一覧と「学習データを保存」。青だと選んだ色とぶつかるので白にした(2026-09-23) */
   .act.ghost2{background:var(--bark-2);color:#FFFFFF;border:1px solid var(--line);}
+  /* 押すたびに選んだ色で光らせる。「戻す」は連打するので、
+     押した手応えが無いと効いたのか分からない(2026-09-23) */
+  .act.ghost2.blink{color:var(--paint);border-color:var(--paint);
+    box-shadow:0 0 0 2px color-mix(in srgb, var(--paint) 35%, transparent);}
   #guessVal{width:46px;text-align:right;font-size:12px;color:var(--sawn-dim);}
   /* 押している最中の見せ方は全部のボタンで同じにする。
      消すモードだけ塗りつぶしていて浮いていた(2026-09-20)。
@@ -649,7 +656,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v80';
+const APP_VER='v81';
 document.getElementById('ver').textContent=APP_VER;
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -1054,8 +1061,8 @@ async function load(file){
     loadAI().then(ok=>{
       const v=document.getElementById('ver');
       v.textContent = APP_VER+(ok ? ' ○' : ' ×');
-      // 読めた時は選んだ色。読めなかった時だけ橙にして目立たせる
-      v.style.color = ok ? markColor : '#FF8A5C';
+      // 読めた時は選んだ色。読めなかった時は白(○と×で見分ける)
+      v.style.color = ok ? markColor : '#FFFFFF';
     });
   }finally{
     busy.classList.add('hide');
@@ -1104,7 +1111,19 @@ document.getElementById('camBtn').onclick=shootPhoto;
 document.getElementById('shootBig').onclick=shootPhoto;
 
 /* 押してもパネルは閉じない。何本も戻したい時に押し直さずに済む */
-document.getElementById('undo').onclick=()=>{ marks.pop(); updateCount(); draw(); };
+/* 押した合図に、選んだ色でひと光りさせる。
+   連打しても毎回光るよう、いったん外してから付け直す */
+function blink(el){
+  el.classList.remove('blink');
+  void el.offsetWidth;
+  el.classList.add('blink');
+  clearTimeout(el._blink);
+  el._blink=setTimeout(()=>el.classList.remove('blink'), 200);
+}
+document.getElementById('undo').onclick=()=>{
+  blink(document.getElementById('undo'));
+  marks.pop(); updateCount(); draw();
+};
 const eraseBtn=document.getElementById('erase'), eraseBanner=document.getElementById('eraseBanner');
 eraseBtn.onclick=()=>{
   eraseMode=!eraseMode;
@@ -1144,7 +1163,7 @@ function isLand(){ return land || innerWidth > innerHeight; }
    縦で見ている時は「横」、横で見ている時は「縦」。 */
 function labelRot(){
   const L=isLand();
-  rotFace.textContent = L ? '縦' : '横';
+  rotFace.textContent = L ? 'タテ' : 'ヨコ';
   rotBtn.classList.toggle('on', L);
   rotBtn.setAttribute('aria-label', L ? '縦向きにする' : '横向きにする');
 }
