@@ -179,11 +179,12 @@
   body.short #calcTop{gap:8px;}
   body.short #calcExpr{font-size:19px;min-height:24px;}
   body.short #calcDisp{font-size:13px;min-height:16px;margin:1px 0 4px;}
-  body.short #calcDisp.answer{font-size:27px;line-height:1;}
+  body.short #calcDisp.answer{font-size:calc(var(--ckfs,19px) * 1.45);line-height:1;}
   /* キーは残りの高さをぜんぶ使う */
   body.short #calcKeys{gap:5px;flex:1 1 auto;min-height:0;}
-  body.short .ck{padding:2px;font-size:19px;border-radius:10px;}
-  body.short .ck.fn{font-size:16px;}
+  /* 字の大きさはキーの大きさに合わせて JS が入れる(--ckfs) */
+  body.short .ck{padding:2px;font-size:var(--ckfs,19px);border-radius:10px;}
+  body.short .ck.fn{font-size:calc(var(--ckfs,19px) * .84);}
   /* 履歴を出した時にキーを押し出さないよう、高さを分け合う */
   body.short #calcHist{max-height:38%;flex:0 1 auto;min-height:0;}
   body.short #calcHist .hrow{padding:7px 10px;}
@@ -665,7 +666,7 @@
 <script>
 /* 画面の隅に出す版の表示。sw.js の CACHE の番号と必ず揃えること。
    ここを直し忘れると、中身が新しくても古い版に見えてしまう。 */
-const APP_VER='v83';
+const APP_VER='v84';
 document.getElementById('ver').textContent=APP_VER;
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -897,6 +898,10 @@ function markRadius(){
 }
 function updateCount(){
   numEl.textContent=marks.length;
+  // 横向きの電卓は本数バッジの横まで広がるので、バッジの幅が変わったら置き直す
+  const cp=document.getElementById('calcPanel');
+  if(cp && !cp.classList.contains('hide') && document.body.classList.contains('short'))
+    requestAnimationFrame(placePanels);
   const el=document.getElementById('countBreak');
   if(aiCount===null || (!addCount && !delCount)){
     el.classList.add('hide');
@@ -1715,11 +1720,31 @@ function placePanels(){
      入る高さいっぱいに広げる。キーは残りを分け合って伸びる。
      真ん中のままだと下のバーのボタンに重なるので、
      重なる分だけ左へ逃がす(2026-09-21)。 */
+  /* 横向きの電卓は、**ボタンに干渉しない範囲でいちばん大きく**する(2026-09-23)。
+     本数バッジ(左上)・右上のボタン・下のバーのボタン(右下)の3つを避けた
+     「空いている四角」を実測し、その中で上の端から下の端まで伸ばす。
+     空きの幅が足りない端末だけ、今までどおり右上のボタンの下から始める。 */
+  let calcTop=topEnd;
   if(short){
-    const W = Math.min(210, Math.max(150, panelMax));
-    const edge   = (firstBtn ? firstBtn.offsetLeft : bar.offsetWidth) - 8;  // ボタンの手前
-    const center = (bar.offsetWidth - W)/2;
-    calcPanel.style.left  = Math.round(Math.max(8, Math.min(center, edge - W)))+'px';
+    const tr=document.getElementById('topRight');
+    const cb=countBox.classList.contains('hide') ? null : countBox;
+    const leftEdge  = (cb ? cb.offsetLeft+cb.offsetWidth : 0) + 10;                 // 本数バッジの右
+    const rightEdge = Math.min(tr.offsetLeft, firstBtn ? firstBtn.offsetLeft : bar.offsetWidth) - 10;
+    const topLine   = Math.min(tr.offsetTop, cb ? cb.offsetTop : tr.offsetTop);     // 上のボタンと頭をそろえる
+    const fullH = appH - panelBottom - topLine;
+    const freeW = rightEdge - leftEdge;
+    const wantW = Math.round(fullH*0.72);       // 4列5段のキーが正方形に近くなる幅
+    let W, L;
+    if(freeW >= 200){
+      W = Math.min(freeW, wantW, 380);
+      L = leftEdge + Math.round((freeW - W)/2);   // 空いた所の真ん中
+      calcTop = topLine;
+    }else{
+      W = Math.min(210, Math.max(150, panelMax));
+      const edge=(firstBtn ? firstBtn.offsetLeft : bar.offsetWidth) - 8;
+      L = Math.max(8, Math.min((bar.offsetWidth - W)/2, edge - W));
+    }
+    calcPanel.style.left  = Math.round(L)+'px';
     calcPanel.style.right = 'auto';
     calcPanel.style.width = W+'px';
     calcPanel.style.maxWidth = 'none';
@@ -1730,9 +1755,12 @@ function placePanels(){
     calcPanel.style.bottom = b+'px';
   }
   const calcBottom = short ? panelBottom : b;
-  const roomCalc=Math.max(120, appH - calcBottom - topEnd);
+  const roomCalc=Math.max(120, appH - calcBottom - calcTop);
   calcPanel.style.maxHeight=roomCalc+'px';
   calcPanel.style.height = short ? roomCalc+'px' : '';
+  // キーが大きくなった分だけ字も大きくする(18〜30px)
+  const keyH=(roomCalc-99)/5;
+  calcPanel.style.setProperty('--ckfs', short ? Math.round(Math.max(18, Math.min(30, keyH*0.45)))+'px' : '');
   const kb=document.getElementById('calcKeys');
   if(kb) kb.style.minHeight='';
 }
